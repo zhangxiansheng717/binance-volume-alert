@@ -10,5 +10,5 @@ jobs:
     steps:
       - name: Trigger Vercel API
         run: |
-          curl -X POST "https://{你的vercel项目域名}/api/monitor" \
+          curl -X POST "https://van-theta.vercel.app/api/monitor" \
           -H "x-auth-token: ${{ secrets.AUTH_TOKEN }}" 
