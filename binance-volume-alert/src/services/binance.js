@@ -3,12 +3,11 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 
 class BinanceService {
     constructor() {
-        this.baseUrl = 'https://fapi.binance.com/fapi/v1'; // 币安合约 API
+        this.baseUrl = 'https://fapi.binance.com/fapi/v1';
     }
 
     async getAllSymbolData() {
         try {
-            // 添加必要的请求头
             const headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -17,32 +16,82 @@ class BinanceService {
                 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
             };
 
-            // V2Ray 代理配置
             const proxyConfig = {
                 host: '127.0.0.1',
-                port: '10809'  // V2Ray 的默认 HTTP 代理端口
+                port: '10809'
             };
 
             const httpsAgent = new HttpsProxyAgent(`http://${proxyConfig.host}:${proxyConfig.port}`);
 
-            console.log('正在获取币安数据...');  // 添加日志
-            // 使用 24小时行情接口
-            const response = await axios.get(`${this.baseUrl}/ticker/24hr`, {
+            // 先获取所有USDT交易对
+            console.log('正在获取交易对列表...');
+            const tickerResponse = await axios.get(`${this.baseUrl}/ticker/24hr`, {
                 headers,
-                timeout: 10000, // 10秒超时
+                timeout: 10000,
                 httpsAgent,
-                proxy: false // 使用 httpsAgent 时需要设置为 false
+                proxy: false
             });
 
-            const filteredData = response.data.filter(item => item.symbol.endsWith('USDT'));
-            console.log(`成功获取到 ${filteredData.length} 个交易对的数据`);  // 添加日志
+            // 过滤出USDT交易对
+            const usdtSymbols = tickerResponse.data
+                .filter(item => item.symbol.endsWith('USDT'))
+                .map(item => item.symbol);
+
+            console.log(`找到 ${usdtSymbols.length} 个USDT交易对，正在获取K线数据...`);
+
+            // 并行获取所有交易对的1分钟K线数据
+            const allData = await Promise.all(
+                usdtSymbols.map(async (symbol) => {
+                    try {
+                        const klineResponse = await axios.get(`${this.baseUrl}/klines`, {
+                            params: {
+                                symbol: symbol,
+                                interval: '1m',
+                                limit: 1,
+                            },
+                            headers,
+                            timeout: 10000,
+                            httpsAgent,
+                            proxy: false
+                        });
+
+                        if (klineResponse.data && klineResponse.data[0]) {
+                            const kline = klineResponse.data[0];
+                            const volume = parseFloat(kline[5]);
+                            const price = parseFloat(kline[4]);
+                            const quoteVolume = parseFloat(kline[7]);
+
+                            return {
+                                symbol: symbol,
+                                volume: volume,
+                                lastPrice: price,
+                                quoteVolume: quoteVolume,
+                                time: new Date(kline[0]).toLocaleString()
+                            };
+                        }
+                        return null;
+                    } catch (error) {
+                        console.error(`获取 ${symbol} K线数据失败:`, error.message);
+                        return null;
+                    }
+                })
+            );
+
+            // 过滤掉获取失败的数据
+            const validData = allData.filter(data => data !== null);
             
-            // 打印前三个交易对的信息作为示例
-            filteredData.slice(0, 3).forEach(item => {
-                console.log(`${item.symbol}: 价格=${item.lastPrice}, 24h成交量=${item.volume}`);
+            // 打印一些示例数据
+            console.log('\n示例数据:');
+            validData.slice(0, 3).forEach(item => {
+                console.log(`${item.symbol}: ` +
+                    `价格=${item.lastPrice.toFixed(4)}, ` +
+                    `1分钟成交量=${item.volume.toFixed(3)}, ` +
+                    `1分钟成交额=${item.quoteVolume.toFixed(2)} USDT`);
             });
 
-            return filteredData;
+            console.log(`\n成功获取 ${validData.length} 个交易对的1分钟K线数据`);
+            return validData;
+
         } catch (error) {
             console.error('获取币安数据时出错:', error.message);
             if (error.response) {

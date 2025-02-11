@@ -4,8 +4,8 @@ const telegramService = require('./telegram');
 class MonitorService {
     constructor() {
         this.previousData = new Map();
-        this.VOLUME_THRESHOLD = 1.05; // 成交量增加1.05倍触发提醒
-        this.PRICE_CHANGE_THRESHOLD = 0.5; // 价格变化0.5%触发提醒
+        this.VOLUME_THRESHOLD = 100; // 成交量增加100倍触发提醒
+        this.MIN_PRICE_CHANGE = 0.1; // 价格至少上涨0.1%才触发提醒
     }
 
     async start() {
@@ -16,7 +16,9 @@ class MonitorService {
         initialData.forEach(item => {
             this.previousData.set(item.symbol, {
                 volume: parseFloat(item.volume),
-                price: parseFloat(item.lastPrice)
+                quoteVolume: parseFloat(item.quoteVolume),
+                price: parseFloat(item.lastPrice),
+                time: item.time
             });
         });
         console.log(`初始化完成，正在监控 ${initialData.length} 个交易对`);
@@ -38,6 +40,7 @@ class MonitorService {
         for (const item of currentData) {
             const symbol = item.symbol;
             const currentVolume = parseFloat(item.volume);
+            const currentQuoteVolume = parseFloat(item.quoteVolume);
             const currentPrice = parseFloat(item.lastPrice);
             
             const previous = this.previousData.get(symbol);
@@ -45,54 +48,54 @@ class MonitorService {
                 const volumeChange = currentVolume / previous.volume;
                 const priceChange = ((currentPrice - previous.price) / previous.price) * 100;
 
-                // 如果成交量增加超过阈值
-                if (volumeChange >= this.VOLUME_THRESHOLD) {
-                    volumeIncreasedPairs.push({
+                // 只在成交量增加且价格上涨时触发
+                if (volumeChange >= this.VOLUME_THRESHOLD && priceChange > this.MIN_PRICE_CHANGE) {
+                    const pairInfo = {
                         symbol,
                         volumeChange: volumeChange.toFixed(2),
-                        priceChange: priceChange.toFixed(2)
-                    });
+                        priceChange: priceChange.toFixed(2),
+                        currentVolume: currentVolume.toFixed(3),
+                        previousVolume: previous.volume.toFixed(3),
+                        currentQuoteVolume: currentQuoteVolume.toFixed(2),
+                        previousQuoteVolume: previous.quoteVolume.toFixed(2),
+                        currentPrice: currentPrice.toFixed(4),
+                        previousPrice: previous.price.toFixed(4),
+                        previousTime: previous.time,
+                        currentTime: item.time
+                    };
 
-                    // 如果同时满足价格变化条件
-                    if (Math.abs(priceChange) >= this.PRICE_CHANGE_THRESHOLD) {
-                        alertPairs.push({
-                            symbol,
-                            volumeChange: volumeChange.toFixed(2),
-                            priceChange: priceChange.toFixed(2)
-                        });
+                    volumeIncreasedPairs.push(pairInfo);
+                    alertPairs.push(pairInfo);
 
-                        // 发送提醒
-                        await telegramService.sendAlert(
-                            symbol,
-                            currentPrice,
-                            priceChange.toFixed(2),
-                            volumeChange.toFixed(2)
-                        );
-                    }
+                    // 发送提醒
+                    await telegramService.sendAlert(
+                        symbol,
+                        currentPrice,
+                        priceChange.toFixed(2),
+                        volumeChange.toFixed(2)
+                    );
                 }
             }
 
             // 更新数据
             this.previousData.set(symbol, {
                 volume: currentVolume,
-                price: currentPrice
+                quoteVolume: currentQuoteVolume,
+                price: currentPrice,
+                time: item.time
             });
         }
 
         // 输出统计信息
-        console.log(`\n成交量增加超过 ${this.VOLUME_THRESHOLD} 倍的交易对: ${volumeIncreasedPairs.length} 个`);
-        if (volumeIncreasedPairs.length > 0) {
-            console.log('\n详细信息:');
-            volumeIncreasedPairs.forEach(pair => {
-                console.log(`${pair.symbol}: 成交量增加 ${pair.volumeChange} 倍, 价格变化 ${pair.priceChange}%`);
-            });
-        }
-
-        console.log(`\n满足所有条件并发送提醒的交易对: ${alertPairs.length} 个`);
+        console.log(`\n检测到 ${alertPairs.length} 个交易对符合条件：`);
         if (alertPairs.length > 0) {
-            console.log('\n已发送提醒的交易对:');
+            console.log('\n详细信息:');
             alertPairs.forEach(pair => {
-                console.log(`${pair.symbol}: 成交量增加 ${pair.volumeChange} 倍, 价格变化 ${pair.priceChange}%`);
+                console.log(`\n${pair.symbol}:`);
+                console.log(`时间对比: ${pair.previousTime} -> ${pair.currentTime}`);
+                console.log(`成交量对比: ${pair.previousVolume} -> ${pair.currentVolume} (增加 ${pair.volumeChange} 倍)`);
+                console.log(`成交额对比: ${pair.previousQuoteVolume} -> ${pair.currentQuoteVolume} USDT`);
+                console.log(`价格对比: ${pair.previousPrice} -> ${pair.currentPrice} (上涨 ${pair.priceChange}%)`);
             });
         }
 
