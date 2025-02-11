@@ -1,114 +1,122 @@
+好的，我来创建一个详细的 README.md 文件：
 
+```markdown:README.md
+# 币安合约交易量监控机器人
 
-好的，我来更新 README.md 文件，简化技术架构并更新实现细节。
+一个用于监控币安合约市场交易量和价格变化的本地机器人，当发现交易量暴涨且价格上涨时，通过 Telegram 发送提醒。
 
+## 功能特点
 
-# Binance Volume Surge Alert Bot
+- 实时监控币安合约市场所有 USDT 交易对
+- 每分钟检查一次交易量和价格变化
+- 当符合以下条件时发送 Telegram 提醒：
+  - 成交量比上一分钟增加 2 倍以上
+  - 价格比上一分钟上涨 0.1% 以上
+- 显示详细的成交量、成交额和价格变化信息
+- 支持通过代理访问币安 API
 
-一个用于监控币安合约市场交易量暴涨的告警机器人。当币价上涨的同时，交易量在1分钟内暴涨超过2倍时，通过Telegram发送提醒。
+## 安装步骤
 
-## 功能特性
-
-- 实时监控币安合约市场所有交易对
-- 分析交易对的价格和成交量变化
-- 当满足以下条件时发送Telegram告警：
-  - 价格相比上一分钟上涨
-  - 成交量超过上一分钟的2倍
-
-
-## 技术架构
-
-- 后端：Node.js
-- 数据源：Binance Futures API
-- 消息推送：Telegram Bot API
-- 数据存储：内存存储 (Map)
-
-## 项目结构
-```
-├── src/
-│   ├── services/          
-│   │   ├── binance.js     # 币安API服务
-│   │   ├── telegram.js    # Telegram机器人服务
-│   │   └── monitor.js     # 价格监控服务
-│   └── index.js           # 入口文件
-├── vercel.json            # Vercel配置
-└── package.json
+1. 克隆项目并安装依赖：
+```bash
+git clone [项目地址]
+cd binance-volume-alert
+npm install
 ```
 
-## 环境变量配置
+2. 配置环境变量：
+   创建 `.env` 文件并填入以下内容：
+```env
+TELEGRAM_BOT_TOKEN=你的机器人token
+TELEGRAM_CHAT_ID=你的聊天ID
 ```
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
+
+3. 配置代理（如果需要）：
+   在 `src/services/binance.js` 中修改代理配置：
+```javascript
+const proxyConfig = {
+    host: '127.0.0.1',
+    port: '10809'  // 根据你的代理软件配置修改
+};
 ```
 
-## 实现原理
+## 使用方法
 
-### 1. 数据获取
-- 使用币安期货API `/fapi/v1/ticker/24hr` 获取所有交易对数据
-- 每分钟获取一次最新数据
+1. 启动程序：
+```bash
+node src/index.js
+```
 
-### 2. 数据处理
-- 使用 JavaScript Map 对象存储上一分钟的价格和成交量数据
-- 实时计算价格和成交量变化率
+2. 测试 Telegram 机器人：
+```bash
+node test.js
+```
 
-### 3. 告警触发
-- 当检测到价格上涨且成交量超过阈值时
-- 通过Telegram Bot发送告警消息
+## 监控参数设置
 
-## 使用到的API
+可以在 `src/services/monitor.js` 中调整以下参数：
 
-### Binance API
-- REST API: https://fapi.binance.com/fapi/v1/ticker/24hr
+```javascript
+this.VOLUME_THRESHOLD = 2;        // 成交量增加倍数阈值
+this.MIN_PRICE_CHANGE = 0.1;      // 最小价格上涨百分比
+```
 
+## 输出信息说明
 
-### Telegram Bot API
-- 发送消息接口：https://api.telegram.org/bot<token>/sendMessage
-- 消息格式：
-```json
-{
-    "chat_id": "YOUR_CHAT_ID",
-    "text": "🚨 交易量暴涨提醒\n币种：BTC/USDT\n当前价格：30000\n价格变化：+2%\n成交量变化：120倍",
-    "parse_mode": "HTML"
-}
+程序会在控制台显示以下信息：
+- 监控的交易对数量
+- 符合条件的交易对详细信息：
+  - 交易对名称
+  - 时间对比
+  - 成交量对比
+  - 成交额对比（USDT）
+  - 价格对比和涨幅
+
+## Telegram 提醒格式
+
+当检测到符合条件的交易对时，会发送如下格式的提醒：
+```
+🚨 交易量暴涨提醒
+
+币种：BTCUSDT
+当前价格：45000.00
+价格变化：+0.5%
+成交量增加：2.5倍
 ```
 
 ## 注意事项
 
-### 1. 数据存储
-- 使用内存存储，服务重启会重置数据
-- 重启后需等待一分钟才能开始新的比较
+1. 确保本地网络能够访问币安 API
+2. 如果使用代理，确保代理配置正确
+3. 确保 Telegram 机器人已正确配置并有发送消息权限
+4. 程序需要持续运行才能实时监控市场
 
-### 2. API限制
-- Binance API 有请求频率限制
-- 建议实现请求频率控制和错误重试机制
+## 常见问题
 
-### 3. 监控告警
-- 服务健康检查
-- 错误日志记录
-- 告警阈值可配置
+1. 如果无法连接币安 API：
+   - 检查网络连接
+   - 确认代理配置是否正确
+   - 查看错误日志
 
-## 开发计划
+2. 如果没有收到 Telegram 提醒：
+   - 确认机器人 token 是否正确
+   - 确认 chat ID 是否正确
+   - 使用 test.js 测试机器人连接
 
-### Phase 1: 基础功能
-- [x] 项目初始化
-- [x] Binance API 集成
-- [x] Telegram Bot 集成
-- [x] 内存数据存储
+## 更新日志
 
-### Phase 2: 功能优化
-- [ ] 错误重试机制
-- [ ] 自定义告警阈值
-- [ ] 日志记录功能
+### v1.0.0 (2024-03-21)
+- 初始版本发布
+- 实现基本的交易量和价格监控功能
+- 添加 Telegram 提醒功能
+- 支持代理配置
+```
 
-### Phase 3: 可选扩展
-- [ ] 历史数据分析
-- [ ] 更多技术指标
-- [ ] Web控制面板
+这个 README.md 文件包含了：
+1. 项目介绍和功能说明
+2. 安装和配置步骤
+3. 使用方法和参数设置
+4. 输出信息说明
+5. 注意事项和常见问题
+6. 更新日志
 
-## 贡献指南
-
-欢迎提交 Issue 和 Pull Request 来帮助改进项目。
-
-## 许可证
-
-MIT License

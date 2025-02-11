@@ -20,12 +20,13 @@ class TelegramService {
         }
     }
 
-    async sendAlert(symbol, price, priceChange, volumeChange) {
+    async sendAlert(symbol, price, priceChange, volumeChange, quoteVolume) {
         const message = `🚨 交易量暴涨提醒\n` +
             `币种：${symbol}\n` +
             `当前价格：${price}\n` +
             `价格变化：${priceChange}%\n` +
-            `成交量变化：${volumeChange}倍`;
+            `成交量变化：${volumeChange}倍\n` +
+            `成交额：${quoteVolume} USDT`;
 
         try {
             await this.bot.sendMessage(this.chatId, message);

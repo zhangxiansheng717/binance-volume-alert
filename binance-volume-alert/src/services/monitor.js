@@ -6,10 +6,12 @@ class MonitorService {
         this.previousData = new Map();
         this.VOLUME_THRESHOLD = 100; // 成交量增加100倍触发提醒
         this.MIN_PRICE_CHANGE = 0.1; // 价格至少上涨0.1%才触发提醒
+        this.MIN_QUOTE_VOLUME = 100000; // 最低成交额限制（USDT）
     }
 
     async start() {
         console.log('开始监控币安合约市场...');
+        console.log(`最低成交额限制: ${this.MIN_QUOTE_VOLUME} USDT`);
         
         // 首次运行获取基准数据
         const initialData = await binanceService.getAllSymbolData();
@@ -48,8 +50,11 @@ class MonitorService {
                 const volumeChange = currentVolume / previous.volume;
                 const priceChange = ((currentPrice - previous.price) / previous.price) * 100;
 
-                // 只在成交量增加且价格上涨时触发
-                if (volumeChange >= this.VOLUME_THRESHOLD && priceChange > this.MIN_PRICE_CHANGE) {
+                // 只在成交量增加、价格上涨且成交额达到最低要求时触发
+                if (volumeChange >= this.VOLUME_THRESHOLD && 
+                    priceChange > this.MIN_PRICE_CHANGE && 
+                    currentQuoteVolume >= this.MIN_QUOTE_VOLUME) {
+                    
                     const pairInfo = {
                         symbol,
                         volumeChange: volumeChange.toFixed(2),
@@ -72,7 +77,8 @@ class MonitorService {
                         symbol,
                         currentPrice,
                         priceChange.toFixed(2),
-                        volumeChange.toFixed(2)
+                        volumeChange.toFixed(2),
+                        currentQuoteVolume.toFixed(2)
                     );
                 }
             }
