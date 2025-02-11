@@ -181,6 +181,45 @@ curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
 sudo yum install -y nodejs
 ```
 
+### CentOS 环境变量修改与重启
+1. 修改环境变量：
+```bash
+# 编辑 .env 文件
+vim /opt/projects/binance-volume-alert/.env
+
+# 确保文件权限正确
+chmod 600 .env
+```
+
+2. 重启服务：
+```bash
+# 方式一：使用 pm2 重启
+pm2 restart binance-monitor
+pm2 restart auto-updater
+
+# 方式二：停止后重新启动
+pm2 stop binance-monitor auto-updater
+pm2 start binance-monitor auto-updater
+
+# 查看是否重启成功
+pm2 status
+
+# 查看日志确认是否正常运行
+pm2 logs binance-monitor
+```
+
+3. 如果重启后仍有问题：
+```bash
+# 删除 pm2 进程并重新启动
+pm2 delete binance-monitor auto-updater
+cd /opt/projects/binance-volume-alert
+pm2 start src/index.js --name "binance-monitor"
+pm2 start src/update.js --name "auto-updater"
+
+# 保存新的进程列表
+pm2 save
+```
+
 ## 配置说明
 
 ### 必需配置
