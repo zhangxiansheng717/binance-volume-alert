@@ -4,7 +4,8 @@ import { sendTelegramMessage } from '../services/telegram.js';
 // 用于存储上一次的数据
 let lastDataMap = new Map();
 
-export default async function handler(req, res) {
+// 修改为 Node.js API 格式
+module.exports = async (req, res) => {
     try {
         // 基本的安全检查
         const authToken = req.headers['x-auth-token'];

@@ -1,6 +1,6 @@
-import fetch from 'node-fetch';
+const fetch = require('node-fetch');
 
-export async function sendTelegramMessage(message) {
+async function sendTelegramMessage(message) {
     const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
     
     try {
@@ -19,4 +19,6 @@ export async function sendTelegramMessage(message) {
         console.error('Telegram API error:', error);
         throw error;
     }
-} 
+}
+
+module.exports = { sendTelegramMessage }; 
