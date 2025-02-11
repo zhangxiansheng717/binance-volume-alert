@@ -4,6 +4,8 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 class BinanceService {
     constructor() {
         this.baseUrl = 'https://fapi.binance.com/fapi/v1';
+        this.requestTimeout = 30000; // 增加到30秒
+        this.retryCount = 3; // 添加重试次数
     }
 
     async getAllSymbolData() {
@@ -23,14 +25,24 @@ class BinanceService {
 
             const httpsAgent = new HttpsProxyAgent(`http://${proxyConfig.host}:${proxyConfig.port}`);
 
-            // 先获取所有USDT交易对
-            console.log('正在获取交易对列表...');
-            const tickerResponse = await axios.get(`${this.baseUrl}/ticker/24hr`, {
-                headers,
-                timeout: 10000,
-                httpsAgent,
-                proxy: false
-            });
+            // 获取交易对列表，添加重试逻辑
+            let tickerResponse;
+            for (let i = 0; i < this.retryCount; i++) {
+                try {
+                    console.log(`正在获取交易对列表${i > 0 ? ` (重试 ${i})` : ''}...`);
+                    tickerResponse = await axios.get(`${this.baseUrl}/ticker/24hr`, {
+                        headers,
+                        timeout: this.requestTimeout,
+                        httpsAgent,
+                        proxy: false
+                    });
+                    break; // 如果成功就跳出循环
+                } catch (error) {
+                    if (i === this.retryCount - 1) throw error; // 最后一次重试失败才抛出错误
+                    console.log(`获取失败，等待重试...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒后重试
+                }
+            }
 
             // 过滤出USDT交易对
             const usdtSymbols = tickerResponse.data
@@ -39,58 +51,74 @@ class BinanceService {
 
             console.log(`找到 ${usdtSymbols.length} 个USDT交易对，正在获取K线数据...`);
 
-            // 并行获取所有交易对的1分钟K线数据
-            const allData = await Promise.all(
-                usdtSymbols.map(async (symbol) => {
-                    try {
-                        const klineResponse = await axios.get(`${this.baseUrl}/klines`, {
-                            params: {
-                                symbol: symbol,
-                                interval: '1m',
-                                limit: 1,
-                            },
-                            headers,
-                            timeout: 10000,
-                            httpsAgent,
-                            proxy: false
-                        });
+            // 分批处理交易对，每批50个
+            const batchSize = 50;
+            const batches = [];
+            for (let i = 0; i < usdtSymbols.length; i += batchSize) {
+                batches.push(usdtSymbols.slice(i, i + batchSize));
+            }
 
-                        if (klineResponse.data && klineResponse.data[0]) {
-                            const kline = klineResponse.data[0];
-                            const volume = parseFloat(kline[5]);
-                            const price = parseFloat(kline[4]);
-                            const quoteVolume = parseFloat(kline[7]);
+            let allData = [];
+            for (let i = 0; i < batches.length; i++) {
+                const batch = batches[i];
+                console.log(`正在处理第 ${i + 1}/${batches.length} 批交易对...`);
+                
+                const batchData = await Promise.all(
+                    batch.map(async (symbol) => {
+                        try {
+                            const klineResponse = await axios.get(`${this.baseUrl}/klines`, {
+                                params: {
+                                    symbol: symbol,
+                                    interval: '1m',
+                                    limit: 1,
+                                },
+                                headers,
+                                timeout: this.requestTimeout,
+                                httpsAgent,
+                                proxy: false
+                            });
 
-                            return {
-                                symbol: symbol,
-                                volume: volume,
-                                lastPrice: price,
-                                quoteVolume: quoteVolume,
-                                time: new Date(kline[0]).toLocaleString()
-                            };
+                            if (klineResponse.data && klineResponse.data[0]) {
+                                const kline = klineResponse.data[0];
+                                const volume = parseFloat(kline[5]);
+                                const price = parseFloat(kline[4]);
+                                const quoteVolume = parseFloat(kline[7]);
+
+                                return {
+                                    symbol: symbol,
+                                    volume: volume,
+                                    lastPrice: price,
+                                    quoteVolume: quoteVolume,
+                                    time: new Date(kline[0]).toLocaleString()
+                                };
+                            }
+                            return null;
+                        } catch (error) {
+                            console.error(`获取 ${symbol} K线数据失败:`, error.message);
+                            return null;
                         }
-                        return null;
-                    } catch (error) {
-                        console.error(`获取 ${symbol} K线数据失败:`, error.message);
-                        return null;
-                    }
-                })
-            );
+                    })
+                );
 
-            // 过滤掉获取失败的数据
-            const validData = allData.filter(data => data !== null);
-            
+                allData = allData.concat(batchData.filter(data => data !== null));
+                
+                // 每批处理完后等待1秒，避免请求过于频繁
+                if (i < batches.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
             // 打印一些示例数据
             console.log('\n示例数据:');
-            validData.slice(0, 3).forEach(item => {
+            allData.slice(0, 3).forEach(item => {
                 console.log(`${item.symbol}: ` +
                     `价格=${item.lastPrice.toFixed(4)}, ` +
                     `1分钟成交量=${item.volume.toFixed(3)}, ` +
                     `1分钟成交额=${item.quoteVolume.toFixed(2)} USDT`);
             });
 
-            console.log(`\n成功获取 ${validData.length} 个交易对的1分钟K线数据`);
-            return validData;
+            console.log(`\n成功获取 ${allData.length} 个交易对的1分钟K线数据`);
+            return allData;
 
         } catch (error) {
             console.error('获取币安数据时出错:', error.message);
