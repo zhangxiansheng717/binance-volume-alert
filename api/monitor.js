@@ -1,5 +1,5 @@
-import { getBinanceData } from '../services/binance';
-import { sendTelegramMessage } from '../services/telegram';
+import { getBinanceData } from '../services/binance.js';
+import { sendTelegramMessage } from '../services/telegram.js';
 
 // 用于存储上一次的数据
 let lastDataMap = new Map();

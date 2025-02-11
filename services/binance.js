@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 const BINANCE_FUTURES_API = 'https://fapi.binance.com';
 
 export async function getBinanceData() {

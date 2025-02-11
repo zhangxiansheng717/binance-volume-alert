@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 export async function sendTelegramMessage(message) {
     const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
     
