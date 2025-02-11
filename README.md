@@ -1,6 +1,3 @@
-好的，我来创建一个详细的 README.md 文件：
-
-```markdown:README.md
 # 币安合约交易量监控机器人
 
 一个用于监控币安合约市场交易量和价格变化的本地机器人，当发现交易量暴涨且价格上涨时，通过 Telegram 发送提醒。
@@ -10,13 +7,16 @@
 - 实时监控币安合约市场所有 USDT 交易对
 - 每分钟检查一次交易量和价格变化
 - 当符合以下条件时发送 Telegram 提醒：
-  - 成交量比上一分钟增加 2 倍以上
+  - 成交量比上一分钟增加 20 倍以上
   - 价格比上一分钟上涨 0.1% 以上
+  - 成交额超过 10 万 USDT
 - 显示详细的成交量、成交额和价格变化信息
-- 支持通过代理访问币安 API
+- 支持通过代理访问币安 API 和 Telegram
+- 支持自动更新
 
-## 安装步骤
+## 安装部署
 
+### 本地开发环境
 1. 克隆项目并安装依赖：
 ```bash
 git clone [项目地址]
@@ -29,57 +29,102 @@ npm install
 ```bash
 cp .env.example .env
 ```
-   然后编辑 `.env` 文件，填入你的配置：
-```env
-# Telegram配置
-TELEGRAM_BOT_TOKEN=你的机器人token
-TELEGRAM_CHAT_ID=你的聊天ID
+   然后编辑 `.env` 文件，填入你的配置。
 
-# 币安API配置（如果需要）
-BINANCE_API_KEY=你的API密钥
-BINANCE_API_SECRET=你的API密钥
-
-# 代理配置
-PROXY_HOST=127.0.0.1
-PROXY_PORT=10809
-USE_PROXY=true  # 设置为false可以禁用代理
-
-# 监控参数
-VOLUME_THRESHOLD=2        # 成交量增加倍数阈值
-MIN_PRICE_CHANGE=0.1     # 最小价格上涨百分比
-MIN_QUOTE_VOLUME=100000  # 最低成交额(USDT)
-CHECK_INTERVAL=60000     # 检查间隔(毫秒)
-```
-
-3. 配置代理（如果需要）：
-   在 `src/services/binance.js` 中修改代理配置：
-```javascript
-const proxyConfig = {
-    host: '127.0.0.1',
-    port: '10809'  // 根据你的代理软件配置修改
-};
-```
-
-## 使用方法
-
-1. 启动程序：
+### 服务器部署
+1. 准备环境：
 ```bash
-node src/index.js
+# 更新系统
+sudo apt update && sudo apt upgrade -y
+
+# 安装 Node.js
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# 安装 git 和 PM2
+sudo apt install git
+sudo npm install pm2 -g
 ```
 
-2. 测试 Telegram 机器人：
+2. 部署项目：
 ```bash
-node test.js
+# 克隆项目
+cd /home/ubuntu/projects
+git clone [项目地址]
+cd binance-volume-alert
+
+# 安装依赖
+npm install
+
+# 配置环境
+cp .env.example .env
+nano .env
+
+# 启动服务
+pm2 start src/index.js --name "binance-monitor"
+pm2 start src/update.js --name "auto-updater"
+
+# 设置开机自启
+pm2 startup
+pm2 save
 ```
 
-## 监控参数设置
+## 配置说明
 
-可以在 `src/services/monitor.js` 中调整以下参数：
+### 必需配置
+1. Telegram配置
+   - `TELEGRAM_BOT_TOKEN`: Telegram机器人的访问令牌
+   - `TELEGRAM_CHAT_ID`: 接收消息的聊天ID
 
-```javascript
-this.VOLUME_THRESHOLD = 2;        // 成交量增加倍数阈值
-this.MIN_PRICE_CHANGE = 0.1;      // 最小价格上涨百分比
+### 可选配置
+1. 代理配置（如果你在无法直接访问币安的地区）
+   - `USE_PROXY`: 是否使用代理（true/false）
+   - `PROXY_HOST`: 代理服务器地址
+   - `PROXY_PORT`: 代理服务器端口
+
+2. 监控参数（都有默认值）
+   - `VOLUME_THRESHOLD`: 成交量增加倍数阈值（默认：20）
+   - `MIN_PRICE_CHANGE`: 最小价格上涨百分比（默认：0.1）
+   - `MIN_QUOTE_VOLUME`: 最低成交额USDT（默认：100000）
+   - `CHECK_INTERVAL`: 检查间隔毫秒（默认：60000）
+
+## 自动更新
+项目包含自动更新功能：
+- 每小时自动检查 GitHub 仓库更新
+- 如有更新自动拉取并重启服务
+- 可通过 `pm2 logs auto-updater` 查看更新日志
+
+## 常用命令
+```bash
+# 查看服务状态
+pm2 status
+
+# 查看日志
+pm2 logs binance-monitor
+pm2 logs auto-updater
+
+# 重启服务
+pm2 restart binance-monitor
+
+# 停止服务
+pm2 stop binance-monitor
 ```
+
+## 注意事项
+
+1. 确保服务器能访问 GitHub（用于自动更新）
+2. 如果使用代理，确保代理配置正确
+3. 确保 Telegram 机器人已正确配置并有发送消息权限
+4. 首次部署建议先运行测试：`node test-telegram.js`
+
+## 更新日志
+
+### v1.0.0 (2024-03-21)
+- 初始版本发布
+- 实现基本的交易量和价格监控功能
+- 添加 Telegram 提醒功能
+- 支持代理配置
+- 添加自动更新功能
 
 ## 输出信息说明
 
@@ -130,6 +175,7 @@ this.MIN_PRICE_CHANGE = 0.1;      // 最小价格上涨百分比
 - 实现基本的交易量和价格监控功能
 - 添加 Telegram 提醒功能
 - 支持代理配置
+- 添加自动更新功能
 
 ## 配置说明
 
@@ -145,7 +191,7 @@ this.MIN_PRICE_CHANGE = 0.1;      // 最小价格上涨百分比
    - `PROXY_PORT`: 代理服务器端口
 
 2. 监控参数（都有默认值）
-   - `VOLUME_THRESHOLD`: 成交量增加倍数阈值（默认：2）
+   - `VOLUME_THRESHOLD`: 成交量增加倍数阈值（默认：20）
    - `MIN_PRICE_CHANGE`: 最小价格上涨百分比（默认：0.1）
    - `MIN_QUOTE_VOLUME`: 最低成交额USDT（默认：100000）
    - `CHECK_INTERVAL`: 检查间隔毫秒（默认：60000）
@@ -155,14 +201,4 @@ this.MIN_PRICE_CHANGE = 0.1;      // 最小价格上涨百分比
    - 如果将来需要访问私有API，再配置以下参数：
      - `BINANCE_API_KEY`: 币安API密钥
      - `BINANCE_API_SECRET`: 币安API密钥
-```
-
-这个 README.md 文件包含了：
-1. 项目介绍和功能说明
-2. 安装和配置步骤
-3. 使用方法和参数设置
-4. 输出信息说明
-5. 注意事项和常见问题
-6. 更新日志
-7. 配置说明
 
