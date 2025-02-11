@@ -1,16 +1,22 @@
-const { getBinanceData } = require('../services/binance.js');
-const { sendTelegramMessage } = require('../services/telegram.js');
+const { getBinanceData } = require('../services/binance');
+const { sendTelegramMessage } = require('../services/telegram');
 
 // 用于存储上一次的数据
 let lastDataMap = new Map();
 
-// 修改为 Node.js API 格式
 module.exports = async (req, res) => {
+    // 只允许 POST 请求
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
     try {
         // 基本的安全检查
         const authToken = req.headers['x-auth-token'];
-        if (authToken !== process.env.AUTH_TOKEN) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        if (!authToken || authToken !== process.env.AUTH_TOKEN) {
+            return res.status(401).json({ 
+                error: 'Unauthorized. Please provide valid auth token in x-auth-token header'
+            });
         }
 
         // 获取币安数据
@@ -44,7 +50,7 @@ module.exports = async (req, res) => {
         // 更新lastDataMap
         lastDataMap = new Map(currentData);
         
-        res.status(200).json({ status: 'success' });
+        res.status(200).json({ status: 'success', message: 'Monitor executed successfully' });
     } catch (error) {
         console.error('Monitor error:', error);
         res.status(500).json({ error: error.message });
