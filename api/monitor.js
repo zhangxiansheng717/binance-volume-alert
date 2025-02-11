@@ -24,10 +24,10 @@ export default async function handler(req, res) {
                 // 检查价格是否上涨
                 const priceChange = (current.price - last.price) / last.price;
                 
-                // 检查成交量是否暴涨(100倍)
+                // 检查成交量是否暴涨(2倍)
                 const volumeRatio = current.volume / last.volume;
                 
-                if (priceChange > 0 && volumeRatio >= 100) {
+                if (priceChange > 0 && volumeRatio >= 2) {
                     // 发送Telegram告警
                     const message = `🚨 交易量暴涨提醒\n` +
                         `币种：${symbol}\n` +
