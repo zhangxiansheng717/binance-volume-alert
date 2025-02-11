@@ -1,0 +1,21 @@
+# 依赖
+node_modules/
+
+# 环境配置
+.env
+
+# 日志
+logs/
+*.log
+
+# 编辑器配置
+.vscode/
+.idea/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 其他
+*.swp
+*.swo

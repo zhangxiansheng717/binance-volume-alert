@@ -1,0 +1,25 @@
+{
+  "name": "binance-volume-alert",
+  "version": "1.0.0",
+  "description": "币安合约交易量监控机器人",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node test-telegram.js"
+  },
+  "keywords": [
+    "binance",
+    "crypto",
+    "trading",
+    "monitor",
+    "telegram"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "https-proxy-agent": "^7.0.6",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
