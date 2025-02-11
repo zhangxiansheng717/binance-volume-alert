@@ -69,6 +69,118 @@ pm2 startup
 pm2 save
 ```
 
+### CentOS 系统部署
+1. 准备环境：
+```bash
+# 更新系统
+sudo yum update -y
+
+# 安装 EPEL 源
+sudo yum install epel-release -y
+
+# 安装 Node.js
+curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+sudo yum install -y nodejs
+
+# 安装开发工具（用于编译某些 npm 包）
+sudo yum groupinstall "Development Tools" -y
+
+# 安装 git
+sudo yum install git -y
+
+# 全局安装 PM2
+sudo npm install pm2 -g
+```
+
+2. 创建项目目录：
+```bash
+# 创建项目目录
+sudo mkdir -p /opt/projects
+sudo chown -R $USER:$USER /opt/projects
+cd /opt/projects
+```
+
+3. 部署项目：
+```bash
+# 克隆项目
+git clone [项目地址]
+cd binance-volume-alert
+
+# 安装依赖
+npm install
+
+# 配置环境变量
+cp .env.example .env
+vim .env  # 或使用 nano .env
+
+# 测试配置
+node test-telegram.js
+
+# 使用 PM2 启动服务
+pm2 start src/index.js --name "binance-monitor"
+pm2 start src/update.js --name "auto-updater"
+
+# 设置开机自启
+pm2 startup
+sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp $HOME
+pm2 save
+```
+
+4. 防火墙配置（如果需要）：
+```bash
+# 如果使用 firewalld
+sudo firewall-cmd --permanent --add-port=80/tcp  # 如果需要对外暴露服务
+sudo firewall-cmd --reload
+
+# 如果使用 iptables
+sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+sudo service iptables save
+```
+
+5. SELinux 设置（如果启用了 SELinux）：
+```bash
+# 查看 SELinux 状态
+getenforce
+
+# 如果需要，可以临时关闭 SELinux
+sudo setenforce 0
+
+# 或永久关闭（需要重启）
+sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
+```
+
+6. 日志查看：
+```bash
+# 查看应用日志
+pm2 logs binance-monitor
+
+# 查看更新服务日志
+pm2 logs auto-updater
+
+# 查看系统日志
+sudo journalctl -u pm2-$USER
+```
+
+7. 常见问题处理：
+- 如果遇到权限问题：
+```bash
+# 确保项目目录权限正确
+sudo chown -R $USER:$USER /opt/projects/binance-volume-alert
+
+# 确保 .env 文件权限正确
+chmod 600 .env
+```
+
+- 如果 Node.js 版本过低：
+```bash
+# 删除旧版本
+sudo yum remove nodejs
+
+# 重新安装新版本
+curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+sudo yum install -y nodejs
+```
+
 ## 配置说明
 
 ### 必需配置
@@ -87,6 +199,12 @@ pm2 save
    - `MIN_PRICE_CHANGE`: 最小价格上涨百分比（默认：0.1）
    - `MIN_QUOTE_VOLUME`: 最低成交额USDT（默认：100000）
    - `CHECK_INTERVAL`: 检查间隔毫秒（默认：60000）
+
+3. 币安API配置（可选）
+   - 本项目仅使用币安的公共API，不需要配置API密钥
+   - 如果将来需要访问私有API，再配置以下参数：
+     - `BINANCE_API_KEY`: 币安API密钥
+     - `BINANCE_API_SECRET`: 币安API密钥
 
 ## 自动更新
 项目包含自动更新功能：
