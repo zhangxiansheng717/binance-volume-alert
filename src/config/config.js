@@ -23,4 +23,35 @@ const config = {
     }
 };
 
+function validateConfig(config) {
+    const required = {
+        'TELEGRAM_BOT_TOKEN': config.telegram.botToken,
+        'TELEGRAM_CHAT_ID': config.telegram.chatId
+    };
+
+    const missing = Object.entries(required)
+        .filter(([key, value]) => !value)
+        .map(([key]) => key);
+
+    if (missing.length > 0) {
+        throw new Error(`缺少必要的配置项: ${missing.join(', ')}`);
+    }
+
+    // 验证数值类型的配置
+    if (config.monitor.volumeThreshold <= 0) {
+        throw new Error('VOLUME_THRESHOLD 必须大于0');
+    }
+    if (config.monitor.minPriceChange < 0) {
+        throw new Error('MIN_PRICE_CHANGE 不能小于0');
+    }
+    if (config.monitor.minQuoteVolume <= 0) {
+        throw new Error('MIN_QUOTE_VOLUME 必须大于0');
+    }
+    if (config.monitor.checkInterval < 5000) {
+        throw new Error('CHECK_INTERVAL 不能小于5000毫秒');
+    }
+}
+
+// 导出前先验证配置
+validateConfig(config);
 module.exports = config; 

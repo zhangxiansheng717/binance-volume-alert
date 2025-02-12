@@ -10,6 +10,7 @@ class MonitorService {
         this.MIN_QUOTE_VOLUME = parseFloat(config.monitor.minQuoteVolume);
         this.isChecking = false;
         this.recentSymbols = []; // 存储最近3个币种的数据
+        this.maxHistorySize = 1000; // 限制历史数据大小
 
         console.log('监控参数:', {
             成交量阈值: this.VOLUME_THRESHOLD + '倍',
@@ -70,6 +71,16 @@ class MonitorService {
         }, 60 * 1000);
     }
 
+    validateData(data) {
+        return data && 
+               typeof data.volume === 'number' && 
+               typeof data.lastPrice === 'number' &&
+               typeof data.avgHistoricalVolume === 'number' &&
+               data.volume > 0 &&
+               data.lastPrice > 0 &&
+               data.avgHistoricalVolume > 0;
+    }
+
     async checkSymbols() {
         if (this.isChecking) {
             console.log('上一次检查还未完成，跳过本次检查');
@@ -82,26 +93,18 @@ class MonitorService {
         
         try {
             const currentData = await binanceService.getAllSymbolData();
-            console.log(`本轮获取到 ${currentData.length} 个交易对数据`);
-            
-            // 添加调试信息
-            if (currentData.length > 0) {
-                console.log('数据示例:', {
-                    第一个交易对: currentData[0].symbol,
-                    数据结构: JSON.stringify(currentData[0], null, 2)
-                });
-            } else {
-                console.log('警告: 没有获取到任何交易对数据');
-            }
+            // 过滤无效数据
+            const validData = currentData.filter(data => this.validateData(data));
+            console.log(`本轮获取到 ${currentData.length} 个交易对，有效数据 ${validData.length} 个`);
             
             // 更新最近3个币种数据
-            this.recentSymbols = currentData.slice(0, 3);
+            this.recentSymbols = validData.slice(0, 3);
             
             // 添加调试信息
             console.log(`已保存最近 ${this.recentSymbols.length} 个币种数据`);
             
             let alertCount = 0;
-            for (const data of currentData) {
+            for (const data of validData) {
                 if (!data) continue;
 
                 const volumeChange = data.volume / data.avgHistoricalVolume;
@@ -152,10 +155,22 @@ class MonitorService {
             
             this.displayRecentSymbols();
             console.log('------------------------');
+
+            // 清理历史数据
+            this.cleanupHistory();
         } catch (error) {
             console.error('检查交易对时发生错误:', error);
         } finally {
             this.isChecking = false;
+        }
+    }
+
+    cleanupHistory() {
+        if (this.previousData.size > this.maxHistorySize) {
+            const entries = Array.from(this.previousData.entries());
+            const toDelete = entries.slice(0, entries.length - this.maxHistorySize);
+            toDelete.forEach(([key]) => this.previousData.delete(key));
+            console.log(`清理历史数据 ${toDelete.length} 条`);
         }
     }
 }
