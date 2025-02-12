@@ -492,3 +492,59 @@ pm2 stop binance-monitor
    - 更新配置文件说明
    - 完善参数说明
 
+## 服务器更新说明
+
+### CentOS 更新步骤
+1. 进入项目目录：
+```bash
+cd /opt/projects/binance-volume-alert  # 或你的项目目录
+```
+
+2. 拉取最新代码：
+```bash
+git pull origin main
+```
+
+3. 如果有新的依赖，安装它们：
+```bash
+npm install
+```
+
+4. 重启服务：
+```bash
+pm2 restart binance-monitor
+```
+
+5. 查看运行状态：
+```bash
+# 查看服务状态
+pm2 status
+
+# 查看日志
+pm2 logs binance-monitor
+```
+
+### 常见问题处理
+1. 如果拉取代码时有冲突：
+```bash
+# 放弃本地修改
+git reset --hard HEAD
+git pull origin main
+```
+
+2. 如果需要回滚到之前版本：
+```bash
+# 查看提交历史
+git log --oneline -5
+
+# 回滚到指定版本
+git reset --hard <commit_id>
+pm2 restart binance-monitor
+```
+
+3. 如果服务启动失败：
+```bash
+# 查看详细错误日志
+pm2 logs binance-monitor --lines 100
+```
+
