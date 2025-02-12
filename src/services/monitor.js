@@ -24,10 +24,11 @@ class MonitorService {
             console.log('\n最近3个币种数据:');
             this.recentSymbols.forEach((data, index) => {
                 console.log(`${index + 1}. ${data.symbol}`);
-                console.log(`   当前5分钟成交额: ${data.volume.toFixed(2)} USDT`);
-                console.log(`   前30分钟平均成交额: ${data.avgHistoricalVolume.toFixed(2)} USDT`);
-                console.log(`   成交额变化倍数: ${(data.volume / data.avgHistoricalVolume).toFixed(2)}倍`);
+                console.log(`   当前5分钟交易量: ${data.volume.toFixed(2)}`);
+                console.log(`   前30分钟平均交易量: ${data.avgHistoricalVolume.toFixed(2)}`);
+                console.log(`   交易量变化倍数: ${(data.volume / data.avgHistoricalVolume).toFixed(2)}倍`);
                 console.log(`   当前价格: ${data.lastPrice}`);
+                console.log(`   5分钟成交额: ${data.quoteVolume.toFixed(2)} USDT`);
             });
             console.log('------------------------');
         }

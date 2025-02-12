@@ -102,14 +102,15 @@ class BinanceService {
                                     const currentKline = klines[6];
                                     const historicalKlines = klines.slice(0, 6);
 
-                                    // 使用USDT成交额计算
+                                    // 使用币种交易量计算（使用 kline[5] 而不是 kline[7]）
                                     const avgVolume = historicalKlines.reduce((sum, kline) => 
-                                        sum + parseFloat(kline[7]), 0) / 6;
+                                        sum + parseFloat(kline[5]), 0) / 6;
 
                                     return {
                                         symbol: symbol,
-                                        volume: parseFloat(currentKline[7]),  // 使用USDT成交额
+                                        volume: parseFloat(currentKline[5]),     // 使用币种交易量
                                         lastPrice: parseFloat(currentKline[4]),
+                                        quoteVolume: parseFloat(currentKline[7]), // 保留成交额用于筛选
                                         time: new Date(currentKline[0]).toLocaleString(),
                                         avgHistoricalVolume: avgVolume
                                     };
