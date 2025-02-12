@@ -61,24 +61,20 @@ class MonitorService {
 
     getNextInterval() {
         const now = new Date();
-        const minutes = now.getMinutes();
-        const seconds = now.getSeconds();
         
-        // 计算到下一个5分钟的毫秒数
-        // 比如现在是 10:02:30，下一个5分钟点是 10:05:00
-        const nextMinutes = Math.ceil(minutes / 5) * 5;
-        const waitMinutes = nextMinutes - minutes;
-        const waitSeconds = -seconds;
+        // 计算下一个5分钟的整点时间
+        const nextTime = new Date(now);
+        nextTime.setMinutes(Math.ceil(now.getMinutes() / 5) * 5);
+        nextTime.setSeconds(3);  // 固定在第3秒
+        nextTime.setMilliseconds(0);
         
-        // 额外等待3秒，确保K线数据已经生成
-        const waitMilliseconds = (waitMinutes * 60 + waitSeconds + 3) * 1000;
-        
-        // 如果等待时间小于等于0，说明需要等待到下一个5分钟
-        if (waitMilliseconds <= 0) {
-            return (5 * 60 + 3) * 1000;
+        // 如果计算出的时间已经过去，就加5分钟
+        if (nextTime <= now) {
+            nextTime.setMinutes(nextTime.getMinutes() + 5);
         }
         
-        return waitMilliseconds;
+        // 返回到下一个检查点的毫秒数
+        return nextTime.getTime() - now.getTime();
     }
 
     scheduleNextCheck() {
