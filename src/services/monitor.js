@@ -59,7 +59,33 @@ class MonitorService {
         }
     }
 
+    getNextInterval() {
+        const now = new Date();
+        const minutes = now.getMinutes();
+        const seconds = now.getSeconds();
+        
+        // 计算到下一个5分钟的毫秒数
+        // 比如现在是 10:02:30，下一个5分钟点是 10:05:00
+        const nextMinutes = Math.ceil(minutes / 5) * 5;
+        const waitMinutes = nextMinutes - minutes;
+        const waitSeconds = -seconds;
+        
+        // 额外等待3秒，确保K线数据已经生成
+        const waitMilliseconds = (waitMinutes * 60 + waitSeconds + 3) * 1000;
+        
+        // 如果等待时间小于等于0，说明需要等待到下一个5分钟
+        if (waitMilliseconds <= 0) {
+            return (5 * 60 + 3) * 1000;
+        }
+        
+        return waitMilliseconds;
+    }
+
     scheduleNextCheck() {
+        const waitTime = this.getNextInterval();
+        const nextCheckTime = new Date(Date.now() + waitTime);
+        console.log(`下次检查时间: ${nextCheckTime.toLocaleString()}`);
+        
         setTimeout(async () => {
             if (!this.isChecking) {
                 try {
@@ -69,7 +95,7 @@ class MonitorService {
                 }
             }
             this.scheduleNextCheck();
-        }, 60 * 1000);
+        }, waitTime);
     }
 
     validateData(data) {
