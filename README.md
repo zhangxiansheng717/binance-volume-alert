@@ -7,12 +7,113 @@
 - 实时监控币安合约市场所有 USDT 交易对
 - 每分钟检查一次交易量和价格变化
 - 当符合以下条件时发送 Telegram 提醒：
-  - 成交量比上一分钟增加 20 倍以上
-  - 价格比上一分钟上涨 0.1% 以上
-  - 成交额超过 10 万 USDT
-- 显示详细的成交量、成交额和价格变化信息
+  - 当前5分钟成交额（USDT）比前30分钟平均成交额增加指定倍数以上
+  - 价格比上一次检查时上涨指定百分比以上
+  - 5分钟成交额超过指定 USDT 金额
+- 显示详细的成交额、价格变化信息
 - 支持通过代理访问币安 API 和 Telegram
 - 支持自动更新
+
+## 监控逻辑说明
+
+1. 交易量计算
+   - 使用5分钟K线的USDT成交额
+   - 当前交易量：最新一根5分钟K线的USDT成交额
+   - 基准交易量：前6根5分钟K线（30分钟）的平均USDT成交额
+
+2. 预警条件
+   - 成交额倍数 = 当前5分钟成交额 ÷ 前30分钟平均成交额
+   - 当成交额倍数超过设定阈值，且满足其他条件时触发预警
+
+3. 显示信息
+   - 每次检查都会显示最近3个交易对的详细数据
+   - 包括当前成交额、平均成交额、变化倍数等
+
+## 快速开始
+
+### 本地运行
+1. 确保你的环境满足以下要求：
+   - Node.js 18.x 或以上版本
+   - npm（通常随 Node.js 一起安装）
+   - 如果在中国大陆使用，需要准备代理
+
+2. 克隆项目并安装依赖：
+```bash
+git clone [项目地址]
+cd binance-volume-alert
+npm install
+```
+
+3. 配置环境变量：
+```bash
+# 复制环境变量示例文件
+cp .env.example .env
+
+# 编辑 .env 文件，填入必要的配置
+# Windows: notepad .env
+# Mac/Linux: nano .env 或 vim .env
+```
+
+4. 配置说明：
+```env
+# Telegram配置（必需）
+TELEGRAM_BOT_TOKEN=你的机器人Token
+TELEGRAM_CHAT_ID=你的聊天ID
+
+# 如果在中国大陆使用，需要配置代理
+USE_PROXY=true
+PROXY_HOST=127.0.0.1
+PROXY_PORT=10809
+
+# 可选：监控参数（有默认值）
+VOLUME_THRESHOLD=2        # 成交量增加倍数阈值
+MIN_PRICE_CHANGE=0.1     # 最小价格变化百分比
+MIN_QUOTE_VOLUME=100000  # 最低成交额（USDT）
+CHECK_INTERVAL=60000     # 检查间隔（毫秒）
+```
+
+5. 测试配置：
+```bash
+# 测试 Telegram 配置是否正确
+node test-telegram.js
+```
+
+6. 运行方式：
+
+方式一：直接运行（适合测试）
+```bash
+# 使用 node 直接运行
+node src/index.js
+
+# 或使用 npm script
+npm start
+```
+
+方式二：后台运行（推荐生产环境使用）
+```bash
+# 全局安装 PM2
+npm install pm2 -g
+
+# 使用 PM2 启动服务
+pm2 start src/index.js --name "binance-monitor"
+
+# 查看运行状态
+pm2 status
+
+# 查看日志
+pm2 logs binance-monitor
+
+# 停止服务
+pm2 stop binance-monitor
+
+# 重启服务
+pm2 restart binance-monitor
+```
+
+7. 常见问题：
+- 如果提示 "Error: connect ETIMEDOUT"，检查代理配置
+- 如果 Telegram 测试失败，检查 Token 和 Chat ID 是否正确
+- 如果需要查看详细日志，可以查看 `logs` 目录下的日志文件
 
 ## 安装部署
 
@@ -358,4 +459,28 @@ pm2 stop binance-monitor
    - 如果将来需要访问私有API，再配置以下参数：
      - `BINANCE_API_KEY`: 币安API密钥
      - `BINANCE_API_SECRET`: 币安API密钥
+
+## 2024-02-12
+### 🔄 监控指标优化：使用USDT成交额替代币种数量
+
+#### 主要更新
+1. 交易量计算逻辑优化
+   - 改用USDT成交额作为监控指标，替代原有的币种数量统计
+   - 当前交易量：最新5分钟K线的USDT成交额
+   - 基准交易量：前30分钟（6根5分钟K线）的平均USDT成交额
+
+2. 显示信息优化
+   - 实时显示最近3个交易对的详细数据
+   - 所有交易量相关显示改为USDT成交额
+   - 添加更多调试信息输出
+
+3. Telegram通知优化
+   - 改进消息格式，显示更清晰
+   - 添加时间戳显示
+   - 统一使用USDT作为成交额单位
+
+4. 文档更新
+   - 添加监控逻辑详细说明
+   - 更新配置文件说明
+   - 完善参数说明
 

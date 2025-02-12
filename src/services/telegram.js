@@ -19,26 +19,24 @@ class TelegramService {
         this.chatId = config.telegram.chatId;
     }
 
-    async sendAlert(symbol, price, priceChange, volumeChange, quoteVolume) {
-        const message = `🚨 交易量暴涨提醒\n\n` +
-            `币种：${symbol}\n` +
-            `当前价格：${price}\n` +
-            `价格变化：${priceChange}%\n` +
-            `成交量变化：${volumeChange}倍\n` +
-            `成交额：${quoteVolume} USDT`;
+    async sendAlert(symbol, price, priceChange, volumeChange, volume) {
+        const message = `🚨 交易量暴涨提醒
+
+币种：${symbol}
+当前价格：${price} USDT
+价格变化：+${priceChange}%
+5分钟成交额变化：${volumeChange}倍
+当前5分钟成交额：${volume} USDT
+
+⏰ ${new Date().toLocaleString()}`;
 
         try {
             await this.bot.sendMessage(this.chatId, message);
             console.log(`已发送 Telegram 提醒: ${symbol}`);
         } catch (error) {
             console.error('发送 Telegram 消息失败:', error.message);
-            // 添加更详细的错误信息
             console.error('完整错误:', error);
             console.error('消息内容:', message);
-            console.error('配置信息:', {
-                botToken: config.telegram.botToken ? '已设置' : '未设置',
-                chatId: config.telegram.chatId
-            });
         }
     }
 
