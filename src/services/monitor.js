@@ -10,7 +10,6 @@ class MonitorService {
         this.MIN_QUOTE_VOLUME = parseFloat(config.monitor.minQuoteVolume);
         this.isChecking = false;
         this.recentSymbols = [];
-        this.maxHistorySize = 200;
 
         console.log('监控参数:', {
             成交量阈值: this.VOLUME_THRESHOLD + '倍',
@@ -191,19 +190,12 @@ class MonitorService {
     }
 
     cleanupHistory() {
-        // 每次检查后都清理超过1小时的数据
+        // 主要依赖时间来清理，而不是数量限制
         const oneHourAgo = Date.now() - 3600000;
         for (const [symbol, data] of this.previousData.entries()) {
             if (data.time < oneHourAgo) {
                 this.previousData.delete(symbol);
             }
-        }
-        
-        // 如果还是太大，继续清理
-        if (this.previousData.size > this.maxHistorySize) {
-            const entries = Array.from(this.previousData.entries());
-            const toDelete = entries.slice(0, entries.length - this.maxHistorySize);
-            toDelete.forEach(([key]) => this.previousData.delete(key));
         }
     }
 }
