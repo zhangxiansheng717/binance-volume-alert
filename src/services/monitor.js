@@ -9,8 +9,8 @@ class MonitorService {
         this.MIN_PRICE_CHANGE = parseFloat(config.monitor.minPriceChange);
         this.MIN_QUOTE_VOLUME = parseFloat(config.monitor.minQuoteVolume);
         this.isChecking = false;
-        this.recentSymbols = []; // 存储最近3个币种的数据
-        this.maxHistorySize = 1000; // 限制历史数据大小
+        this.recentSymbols = [];
+        this.maxHistorySize = 200;
 
         console.log('监控参数:', {
             成交量阈值: this.VOLUME_THRESHOLD + '倍',
@@ -42,16 +42,14 @@ class MonitorService {
             // 首次运行获取基准数据
             const initialData = await binanceService.getAllSymbolData();
             initialData.forEach(item => {
+                // 只保存必要的数据
                 this.previousData.set(item.symbol, {
-                    volume: parseFloat(item.volume),
-                    quoteVolume: parseFloat(item.quoteVolume),
-                    price: parseFloat(item.lastPrice),
+                    lastPrice: parseFloat(item.lastPrice),
                     time: item.time
                 });
             });
             console.log(`初始化完成，正在监控 ${initialData.length} 个交易对`);
 
-            // 使用递归方式进行定时检查，而不是 setInterval
             this.scheduleNextCheck();
         } catch (error) {
             console.error('初始化失败:', error);
@@ -112,7 +110,6 @@ class MonitorService {
 
         this.isChecking = true;
         console.log('\n开始新一轮市场检查...');
-        console.log('当前时间:', new Date().toLocaleString());
         
         try {
             const currentData = await binanceService.getAllSymbolData();
@@ -120,11 +117,14 @@ class MonitorService {
             const validData = currentData.filter(data => this.validateData(data));
             console.log(`本轮获取到 ${currentData.length} 个交易对，有效数据 ${validData.length} 个`);
             
-            // 更新最近3个币种数据
-            this.recentSymbols = validData.slice(0, 3);
-            
-            // 添加调试信息
-            console.log(`已保存最近 ${this.recentSymbols.length} 个币种数据`);
+            // 深拷贝最近3个币种数据，避免引用
+            this.recentSymbols = validData.slice(0, 3).map(data => ({
+                symbol: data.symbol,
+                volume: data.volume,
+                avgHistoricalVolume: data.avgHistoricalVolume,
+                lastPrice: data.lastPrice,
+                quoteVolume: data.quoteVolume
+            }));
             
             let alertCount = 0;
             for (const data of validData) {
@@ -137,7 +137,11 @@ class MonitorService {
                     
                     const previousPrice = this.previousData.get(data.symbol)?.lastPrice;
                     if (!previousPrice) {
-                        this.previousData.set(data.symbol, data);
+                        // 只保存必要的数据
+                        this.previousData.set(data.symbol, {
+                            lastPrice: data.lastPrice,
+                            time: data.time
+                        });
                         continue;
                     }
 
@@ -165,24 +169,20 @@ class MonitorService {
                     }
                 }
 
-                this.previousData.set(data.symbol, data);
+                // 只保存必要的数据
+                this.previousData.set(data.symbol, {
+                    lastPrice: data.lastPrice,
+                    time: data.time
+                });
             }
+            
+            // 每次检查后都清理历史数据
+            this.cleanupHistory();
             
             console.log(`\n本轮检查完成`);
             console.log(`发送提醒: ${alertCount} 个`);
-            
-            // 添加调试信息
-            console.log('准备显示最近币种数据...');
-            console.log('recentSymbols 长度:', this.recentSymbols.length);
-            if (this.recentSymbols.length > 0) {
-                console.log('第一个币种数据:', this.recentSymbols[0]);
-            }
-            
             this.displayRecentSymbols();
-            console.log('------------------------');
-
-            // 清理历史数据
-            this.cleanupHistory();
+            
         } catch (error) {
             console.error('检查交易对时发生错误:', error);
         } finally {
@@ -191,11 +191,19 @@ class MonitorService {
     }
 
     cleanupHistory() {
+        // 每次检查后都清理超过1小时的数据
+        const oneHourAgo = Date.now() - 3600000;
+        for (const [symbol, data] of this.previousData.entries()) {
+            if (data.time < oneHourAgo) {
+                this.previousData.delete(symbol);
+            }
+        }
+        
+        // 如果还是太大，继续清理
         if (this.previousData.size > this.maxHistorySize) {
             const entries = Array.from(this.previousData.entries());
             const toDelete = entries.slice(0, entries.length - this.maxHistorySize);
             toDelete.forEach(([key]) => this.previousData.delete(key));
-            console.log(`清理历史数据 ${toDelete.length} 条`);
         }
     }
 }
