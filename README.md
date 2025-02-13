@@ -428,7 +428,7 @@ cd /opt/projects/binance-volume-alert  # 或你的项目目录
 
 2. 拉取最新代码：
 ```bash
-git pull origin main
+git pull origin master
 ```
 
 3. 如果有新的依赖，安装它们：
@@ -455,7 +455,7 @@ pm2 logs binance-monitor
 ```bash
 # 放弃本地修改
 git reset --hard HEAD
-git pull origin main
+git pull origin master
 ```
 
 2. 如果需要回滚到之前版本：

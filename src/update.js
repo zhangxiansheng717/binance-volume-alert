@@ -23,7 +23,7 @@ async function update() {
         console.log('开始更新...');
         
         // 拉取最新代码
-        await runCommand('git pull');
+        await runCommand('git pull origin master');
         
         // 安装依赖
         await runCommand('npm install');
