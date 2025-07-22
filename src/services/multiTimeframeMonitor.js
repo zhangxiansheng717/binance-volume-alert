@@ -278,7 +278,8 @@ class MultiTimeframeMonitorService {
                             data.lastPrice.toFixed(4),
                             priceChange.toFixed(2),
                             volumeChange.toFixed(2),
-                            data.quoteVolume.toFixed(2)
+                            data.quoteVolume.toFixed(2),
+                            timeframeName
                         );
                         alertCount++;
                     }

@@ -19,14 +19,14 @@ class TelegramService {
         this.chatId = config.telegram.chatId;
     }
 
-    async sendAlert(symbol, price, priceChange, volumeChange, quoteVolume) {
+    async sendAlert(symbol, price, priceChange, volumeChange, quoteVolume, timeframe = '5分钟') {
         const message = `🚨 交易量暴涨提醒
 
 币种：${symbol}
 当前价格：${price} USDT
 价格变化：+${priceChange}%
-5分钟交易量变化：${volumeChange}倍
-5分钟成交额：${quoteVolume} USDT
+${timeframe}交易量变化：${volumeChange}倍
+${timeframe}成交额：${quoteVolume} USDT
 
 ⏰ ${new Date().toLocaleString()}`;
 
