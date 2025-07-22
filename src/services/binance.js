@@ -89,7 +89,7 @@ class BinanceService {
                                     params: {
                                         symbol: symbol,
                                         interval: '5m',
-                                        limit: 7,
+                                        limit: 8,  // 改为获取8根K线
                                     },
                                     headers,
                                     timeout: this.requestTimeout,
@@ -97,14 +97,15 @@ class BinanceService {
                                     proxy: false
                                 });
 
-                                if (klineResponse.data && klineResponse.data.length >= 7) {
+                                if (klineResponse.data && klineResponse.data.length >= 8) {  // 改为检查8根K线
                                     const klines = klineResponse.data;
-                                    const currentKline = klines[6];
-                                    const historicalKlines = klines.slice(0, 6);
+                                    // 修复：使用已完成的最新K线，而不是正在进行中的K线
+                                    const currentKline = klines[6];  // 使用第7根K线（已完成）
+                                    const historicalKlines = klines.slice(0, 6);  // 前6根K线作为历史基准（30分钟）
 
                                     // 使用币种交易量计算（使用 kline[5] 而不是 kline[7]）
                                     const avgVolume = historicalKlines.reduce((sum, kline) => 
-                                        sum + parseFloat(kline[5]), 0) / 6;
+                                        sum + parseFloat(kline[5]), 0) / 6;  // 6根K线30分钟平均
 
                                     return {
                                         symbol: symbol,

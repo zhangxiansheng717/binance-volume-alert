@@ -23,7 +23,7 @@ class MonitorService {
             console.log('\n最近3个币种数据:');
             this.recentSymbols.forEach((data, index) => {
                 console.log(`${index + 1}. ${data.symbol}`);
-                console.log(`   当前5分钟交易量: ${data.volume.toFixed(2)} 个`);
+                console.log(`   最新完整5分钟交易量: ${data.volume.toFixed(2)} 个`);
                 console.log(`   前30分钟平均交易量: ${data.avgHistoricalVolume.toFixed(2)} 个`);
                 console.log(`   交易量变化倍数: ${(data.volume / data.avgHistoricalVolume).toFixed(2)}倍`);
                 console.log(`   当前价格: ${data.lastPrice}`);
@@ -150,8 +150,8 @@ class MonitorService {
                         console.log('\n发现异常交易对:');
                         console.log(`币种: ${data.symbol}`);
                         console.log(`时间: ${data.time}`);
-                        console.log(`当前交易量: ${data.volume.toFixed(2)} 个`);
-                        console.log(`平均交易量: ${data.avgHistoricalVolume.toFixed(2)} 个`);
+                        console.log(`最新完整5分钟交易量: ${data.volume.toFixed(2)} 个`);
+                        console.log(`前30分钟平均交易量: ${data.avgHistoricalVolume.toFixed(2)} 个`);
                         console.log(`交易量变化: ${volumeChange.toFixed(2)}倍`);
                         console.log(`价格变化: ${priceChange.toFixed(2)}%`);
                         console.log(`成交额: ${data.quoteVolume.toFixed(2)} USDT`);
