@@ -19,7 +19,54 @@ const config = {
         volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD) || 2,
         minPriceChange: parseFloat(process.env.MIN_PRICE_CHANGE) || 0.1,
         minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME) || 100000,
-        checkInterval: parseInt(process.env.CHECK_INTERVAL) || 60000
+        checkInterval: parseInt(process.env.CHECK_INTERVAL) || 60000,
+        
+        // 多时间周期监控配置
+        timeframes: {
+            enabled: process.env.ENABLE_MULTI_TIMEFRAME === 'true' || true, // 默认启用
+            intervals: [
+                {
+                    interval: '5m',
+                    enabled: true,
+                    volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_5M) || 2,
+                    minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_5M) || 100000,
+                    scheduleSeconds: 3, // 在周期开始后第3秒检查
+                    historyPeriods: 6   // 历史基准周期数（30分钟）
+                },
+                {
+                    interval: '15m',
+                    enabled: process.env.ENABLE_15M !== 'false', // 默认启用
+                    volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_15M) || 2.5,
+                    minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_15M) || 300000,
+                    scheduleSeconds: 10, // 在周期开始后第10秒检查
+                    historyPeriods: 6    // 历史基准周期数（90分钟）
+                },
+                {
+                    interval: '1h',
+                    enabled: process.env.ENABLE_1H !== 'false', // 默认启用
+                    volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_1H) || 3,
+                    minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_1H) || 1000000,
+                    scheduleSeconds: 30, // 在周期开始后第30秒检查
+                    historyPeriods: 6    // 历史基准周期数（6小时）
+                },
+                {
+                    interval: '4h',
+                    enabled: process.env.ENABLE_4H !== 'false', // 默认启用
+                    volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_4H) || 4,
+                    minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_4H) || 5000000,
+                    scheduleSeconds: 120, // 在周期开始后第2分钟检查
+                    historyPeriods: 6     // 历史基准周期数（24小时）
+                },
+                {
+                    interval: '1d',
+                    enabled: process.env.ENABLE_1D !== 'false', // 默认启用
+                    volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_1D) || 5,
+                    minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_1D) || 10000000,
+                    scheduleSeconds: 300, // 在周期开始后第5分钟检查
+                    historyPeriods: 6     // 历史基准周期数（6天）
+                }
+            ]
+        }
     }
 };
 
@@ -37,7 +84,21 @@ function validateConfig(config) {
         throw new Error(`缺少必要的配置项: ${missing.join(', ')}`);
     }
 
-    // 验证数值类型的配置
+    // 验证多时间周期配置
+    if (config.monitor.timeframes.enabled) {
+        config.monitor.timeframes.intervals.forEach(tf => {
+            if (tf.enabled) {
+                if (tf.volumeThreshold <= 0) {
+                    throw new Error(`${tf.interval} VOLUME_THRESHOLD 必须大于0`);
+                }
+                if (tf.minQuoteVolume <= 0) {
+                    throw new Error(`${tf.interval} MIN_QUOTE_VOLUME 必须大于0`);
+                }
+            }
+        });
+    }
+
+    // 验证原有的数值类型配置
     if (config.monitor.volumeThreshold <= 0) {
         throw new Error('VOLUME_THRESHOLD 必须大于0');
     }
@@ -52,6 +113,11 @@ function validateConfig(config) {
     }
 }
 
-// 导出前先验证配置
-validateConfig(config);
-module.exports = config; 
+module.exports = config;
+
+try {
+    validateConfig(config);
+} catch (error) {
+    console.error('配置验证失败:', error.message);
+    process.exit(1);
+} 

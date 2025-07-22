@@ -43,10 +43,11 @@ class BinanceService {
         }
     }
 
-    async getAllSymbolData() {
+    // 新的多时间周期数据获取方法
+    async getAllSymbolDataForTimeframe(timeframeConfig) {
         try {
             return await this.retryRequest(async () => {
-                console.log('开始获取所有交易对数据...');
+                console.log(`开始获取所有交易对 ${timeframeConfig.interval} 数据...`);
                 const { headers, httpsAgent } = this.getHeaders();
                 
                 console.log('正在获取24小时行情数据...');
@@ -57,20 +58,11 @@ class BinanceService {
                     proxy: false
                 });
 
-                // 添加调试信息
-                console.log('24小时行情数据响应长度:', tickerResponse.data.length);
-                if (tickerResponse.data.length > 0) {
-                    console.log('第一个交易对数据示例:', tickerResponse.data[0]);
-                }
-
                 const usdtSymbols = tickerResponse.data
                     .filter(ticker => ticker.symbol.endsWith('USDT'))
                     .map(ticker => ticker.symbol);
                 
-                console.log(`找到 ${usdtSymbols.length} 个USDT交易对`);
-                if (usdtSymbols.length > 0) {
-                    console.log('前3个交易对:', usdtSymbols.slice(0, 3));
-                }
+                console.log(`找到 ${usdtSymbols.length} 个USDT交易对 (${timeframeConfig.interval})`);
 
                 // 将交易对分成批次处理
                 const batchSize = 50;
@@ -88,8 +80,8 @@ class BinanceService {
                                 const klineResponse = await axios.get(`${this.baseUrl}/klines`, {
                                     params: {
                                         symbol: symbol,
-                                        interval: '5m',
-                                        limit: 8,  // 改为获取8根K线
+                                        interval: timeframeConfig.interval,
+                                        limit: timeframeConfig.historyPeriods + 2, // +2 确保有足够数据
                                     },
                                     headers,
                                     timeout: this.requestTimeout,
@@ -97,28 +89,30 @@ class BinanceService {
                                     proxy: false
                                 });
 
-                                if (klineResponse.data && klineResponse.data.length >= 8) {  // 改为检查8根K线
+                                if (klineResponse.data && klineResponse.data.length >= timeframeConfig.historyPeriods + 2) {
                                     const klines = klineResponse.data;
-                                    // 修复：使用已完成的最新K线，而不是正在进行中的K线
-                                    const currentKline = klines[6];  // 使用第7根K线（已完成）
-                                    const historicalKlines = klines.slice(0, 6);  // 前6根K线作为历史基准（30分钟）
+                                    // 使用已完成的最新K线
+                                    const currentKline = klines[timeframeConfig.historyPeriods];
+                                    const historicalKlines = klines.slice(0, timeframeConfig.historyPeriods);
 
-                                    // 使用币种交易量计算（使用 kline[5] 而不是 kline[7]）
+                                    // 使用币种交易量计算
                                     const avgVolume = historicalKlines.reduce((sum, kline) => 
-                                        sum + parseFloat(kline[5]), 0) / 6;  // 6根K线30分钟平均
+                                        sum + parseFloat(kline[5]), 0) / timeframeConfig.historyPeriods;
 
                                     return {
                                         symbol: symbol,
+                                        interval: timeframeConfig.interval,
                                         volume: parseFloat(currentKline[5]),     // 使用币种交易量
                                         lastPrice: parseFloat(currentKline[4]),
                                         quoteVolume: parseFloat(currentKline[7]), // 保留成交额用于筛选
                                         time: new Date(currentKline[0]).toLocaleString(),
-                                        avgHistoricalVolume: avgVolume
+                                        avgHistoricalVolume: avgVolume,
+                                        timeframeConfig: timeframeConfig
                                     };
                                 }
                                 return null;
                             } catch (error) {
-                                console.error(`获取 ${symbol} K线数据失败:`, error.message);
+                                console.error(`获取 ${symbol} ${timeframeConfig.interval} K线数据失败:`, error.message);
                                 return null;
                             }
                         })
@@ -132,11 +126,11 @@ class BinanceService {
                     }
                 }
 
-                console.log(`数据获取完成，共处理 ${allData.length} 个交易对`);
+                console.log(`${timeframeConfig.interval} 数据获取完成，共处理 ${allData.length} 个交易对`);
                 return allData;
             });
         } catch (error) {
-            console.error('获取所有交易对数据失败:', error.message);
+            console.error(`获取所有交易对 ${timeframeConfig.interval} 数据失败:`, error.message);
             if (error.response) {
                 console.error('错误详情:', {
                     status: error.response.status,
@@ -146,6 +140,15 @@ class BinanceService {
             }
             throw error;
         }
+    }
+
+    // 保留原有方法用于向后兼容
+    async getAllSymbolData() {
+        const defaultTimeframe = {
+            interval: '5m',
+            historyPeriods: 6
+        };
+        return this.getAllSymbolDataForTimeframe(defaultTimeframe);
     }
 
     async getSymbols() {
