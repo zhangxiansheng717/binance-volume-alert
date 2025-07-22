@@ -19,7 +19,7 @@ const config = {
         volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD) || 2,
         minPriceChange: parseFloat(process.env.MIN_PRICE_CHANGE) || 0.1,
         minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME) || 100000,
-        checkInterval: parseInt(process.env.CHECK_INTERVAL) || 60000,
+
         
         // 多时间周期监控配置
         timeframes: {
@@ -108,9 +108,7 @@ function validateConfig(config) {
     if (config.monitor.minQuoteVolume <= 0) {
         throw new Error('MIN_QUOTE_VOLUME 必须大于0');
     }
-    if (config.monitor.checkInterval < 5000) {
-        throw new Error('CHECK_INTERVAL 不能小于5000毫秒');
-    }
+
 }
 
 module.exports = config;
