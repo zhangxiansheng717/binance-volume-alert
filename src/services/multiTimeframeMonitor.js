@@ -4,17 +4,15 @@ const config = require('../config/config');
 
 class MultiTimeframeMonitorService {
     constructor() {
-        this.previousData = new Map(); // 存储各时间周期的历史价格数据
         this.recentSymbols = new Map(); // 存储各时间周期的最近币种数据
         this.isChecking = new Map(); // 存储各时间周期的检查状态
         this.scheduledJobs = new Map(); // 存储定时任务
-        this.MIN_PRICE_CHANGE = parseFloat(config.monitor.minPriceChange);
 
         console.log('多时间周期监控服务初始化...');
         console.log('启用的时间周期:', 
             config.monitor.timeframes.intervals
                 .filter(tf => tf.enabled)
-                .map(tf => tf.interval)
+                .map(tf => `${tf.interval}(阈值${tf.priceThreshold}%)`)
                 .join(', ')
         );
     }
@@ -53,19 +51,17 @@ class MultiTimeframeMonitorService {
         const recentData = this.recentSymbols.get(interval);
         if (recentData && recentData.length > 0) {
             const timeframeName = this.getTimeframeName(interval);
-            const historyDesc = this.getHistoryPeriodDescription(
-                interval, 
-                recentData[0].timeframeConfig.historyPeriods
-            );
             
-            console.log(`\n${timeframeName}周期 - 最近3个币种数据:`);
+            console.log(`\n📋 ${timeframeName}周期 - 最近符合条件的前3个交易对:`);
             recentData.forEach((data, index) => {
-                console.log(`${index + 1}. ${data.symbol}`);
-                console.log(`   最新完整${timeframeName}交易量: ${data.volume.toFixed(2)} 个`);
-                console.log(`   前${historyDesc}平均交易量: ${data.avgHistoricalVolume.toFixed(2)} 个`);
-                console.log(`   交易量变化倍数: ${(data.volume / data.avgHistoricalVolume).toFixed(2)}倍`);
-                console.log(`   当前价格: ${data.lastPrice}`);
-                console.log(`   ${timeframeName}成交额: ${data.quoteVolume.toFixed(2)} USDT`);
+                const direction = data.priceChange >= 0 ? '↗️上涨' : '↘️下跌';
+                const intensityTag = data.x >= 3 ? '💥爆' : data.x >= 2 ? '⚡强' : '📊超阈';
+                
+                console.log(`${index + 1}. ${data.symbol} (${intensityTag})`);
+                console.log(`   价格变动: ${data.priceChange >= 0 ? '+' : ''}${data.priceChange.toFixed(2)}% ${direction}`);
+                console.log(`   强度 x: ${data.x.toFixed(2)}`);
+                console.log(`   量能倍数: ${data.volumeMultiplier.toFixed(2)}x`);
+                console.log(`   当前价格: ${data.lastPrice.toFixed(4)}`);
             });
             console.log('------------------------');
         }
@@ -93,19 +89,12 @@ class MultiTimeframeMonitorService {
                 const initialData = await binanceService.getAllSymbolDataForTimeframe(timeframeConfig);
                 const dataKey = timeframeConfig.interval;
                 
-                // 初始化该时间周期的数据
-                const priceData = new Map();
-                initialData.forEach(item => {
-                    priceData.set(item.symbol, {
-                        lastPrice: parseFloat(item.lastPrice),
-                        time: item.time
-                    });
-                });
-                
-                this.previousData.set(dataKey, priceData);
+                // 初始化该时间周期的检查状态
                 this.isChecking.set(dataKey, false);
                 
                 console.log(`${timeframeConfig.interval} 时间周期初始化完成，正在监控 ${initialData.length} 个交易对`);
+                console.log(`  价格阈值: ${timeframeConfig.priceThreshold}%`);
+                console.log(`  冷却时间: ${timeframeConfig.cooldownMinutes}分钟`);
 
                 // 启动定时检查
                 this.scheduleNextCheck(timeframeConfig);
@@ -213,91 +202,95 @@ class MultiTimeframeMonitorService {
         }
 
         this.isChecking.set(dataKey, true);
-        console.log(`\n开始新一轮${timeframeName}周期市场检查...`);
+        console.log(`\n⏰ 开始新一轮${timeframeName}周期市场检查...`);
         
         try {
             const currentData = await binanceService.getAllSymbolDataForTimeframe(timeframeConfig);
             const validData = currentData.filter(data => this.validateData(data));
-            console.log(`${timeframeName}周期获取到 ${currentData.length} 个交易对，有效数据 ${validData.length} 个`);
+            console.log(`📊 ${timeframeName}周期获取到 ${currentData.length} 个交易对，有效数据 ${validData.length} 个`);
             
-            // 深拷贝最近3个币种数据
-            this.recentSymbols.set(dataKey, validData.slice(0, 3).map(data => ({
-                symbol: data.symbol,
-                interval: data.interval,
-                volume: data.volume,
-                avgHistoricalVolume: data.avgHistoricalVolume,
-                lastPrice: data.lastPrice,
-                quoteVolume: data.quoteVolume,
-                timeframeConfig: data.timeframeConfig
-            })));
-            
-            let alertCount = 0;
-            const previousPriceData = this.previousData.get(dataKey);
+            // 计算每个币种的涨幅（相对K线开盘价）
+            const alertCandidates = [];
             
             for (const data of validData) {
                 if (!data) continue;
 
-                const volumeChange = data.volume / data.avgHistoricalVolume;
+                // 计算价格变动（相对K线开盘价）
+                const priceChange = ((data.lastPrice - data.openPrice) / data.openPrice) * 100;
                 
-                if (volumeChange >= timeframeConfig.volumeThreshold && 
-                    data.quoteVolume >= timeframeConfig.minQuoteVolume) {
+                // 检查是否达到阈值
+                if (Math.abs(priceChange) >= timeframeConfig.priceThreshold) {
+                    // 计算强度 x = |变动幅度| / 阈值
+                    const x = Math.abs(priceChange) / timeframeConfig.priceThreshold;
                     
-                    const previousPrice = previousPriceData?.get(data.symbol)?.lastPrice;
-                    if (!previousPrice) {
-                        // 只保存必要的数据
-                        if (!previousPriceData.has(data.symbol)) {
-                            previousPriceData.set(data.symbol, {
-                                lastPrice: data.lastPrice,
-                                time: data.time
-                            });
-                        }
-                        continue;
-                    }
-
-                    const priceChange = ((data.lastPrice - previousPrice) / previousPrice) * 100;
-
-                    if (priceChange >= this.MIN_PRICE_CHANGE) {
-                        const historyDesc = this.getHistoryPeriodDescription(
-                            timeframeConfig.interval, 
-                            timeframeConfig.historyPeriods
-                        );
-                        
-                        console.log(`\n发现${timeframeName}周期异常交易对:`);
-                        console.log(`币种: ${data.symbol}`);
-                        console.log(`时间周期: ${timeframeName}`);
-                        console.log(`时间: ${data.time}`);
-                        console.log(`最新完整${timeframeName}交易量: ${data.volume.toFixed(2)} 个`);
-                        console.log(`前${historyDesc}平均交易量: ${data.avgHistoricalVolume.toFixed(2)} 个`);
-                        console.log(`交易量变化: ${volumeChange.toFixed(2)}倍`);
-                        console.log(`价格变化: ${priceChange.toFixed(2)}%`);
-                        console.log(`${timeframeName}成交额: ${data.quoteVolume.toFixed(2)} USDT`);
-                        console.log('------------------------');
-
-                        await telegramService.sendAlert(
-                            `${data.symbol} (${timeframeName})`,
-                            data.lastPrice.toFixed(4),
-                            priceChange.toFixed(2),
-                            volumeChange.toFixed(2),
-                            data.quoteVolume.toFixed(2),
-                            timeframeName
-                        );
-                        alertCount++;
-                    }
+                    alertCandidates.push({
+                        ...data,
+                        priceChange,
+                        x,
+                        timeframeName
+                    });
                 }
-
-                // 更新价格数据
-                previousPriceData.set(data.symbol, {
-                    lastPrice: data.lastPrice,
-                    time: data.time
-                });
             }
             
-            console.log(`\n${timeframeName}周期检查完成`);
-            console.log(`发送提醒: ${alertCount} 个`);
+            // 按强度排序（x从大到小，x相同则按量能倍数）
+            alertCandidates.sort((a, b) => {
+                if (Math.abs(b.x - a.x) > 0.01) {
+                    return b.x - a.x;
+                }
+                return b.volumeMultiplier - a.volumeMultiplier;
+            });
+            
+            console.log(`🎯 发现 ${alertCandidates.length} 个符合阈值的交易对`);
+            
+            // 保存最近数据用于展示
+            this.recentSymbols.set(dataKey, alertCandidates.slice(0, 3));
+            
+            // 发送提醒
+            let alertCount = 0;
+            let cooldownSkipped = 0;
+            
+            for (const data of alertCandidates) {
+                const historyDesc = this.getHistoryPeriodDescription(
+                    timeframeConfig.interval, 
+                    timeframeConfig.historyPeriods
+                );
+                
+                const direction = data.priceChange >= 0 ? '上涨' : '下跌';
+                const volumeChange = data.volume / data.avgHistoricalVolume;
+                
+                console.log(`\n📈 ${data.symbol} (${timeframeName})`);
+                console.log(`   开盘价: ${data.openPrice.toFixed(4)}`);
+                console.log(`   当前价: ${data.lastPrice.toFixed(4)}`);
+                console.log(`   价格变动: ${data.priceChange.toFixed(2)}% (${direction})`);
+                console.log(`   强度 x: ${data.x.toFixed(2)}`);
+                console.log(`   量能倍数: ${data.volumeMultiplier.toFixed(2)}x`);
+                console.log(`   交易量变化: ${volumeChange.toFixed(2)}倍`);
+                
+                // 发送提醒（包含冷却检查）
+                const sent = await telegramService.sendAlert({
+                    symbol: data.symbol,
+                    price: data.lastPrice.toFixed(4),
+                    priceChange: data.priceChange,
+                    interval: timeframeConfig.interval,
+                    threshold: timeframeConfig.priceThreshold,
+                    volumeMultiplier: data.volumeMultiplier,
+                    cooldownMinutes: timeframeConfig.cooldownMinutes
+                });
+                
+                if (sent) {
+                    alertCount++;
+                } else {
+                    cooldownSkipped++;
+                }
+            }
+            
+            console.log(`\n✅ ${timeframeName}周期检查完成`);
+            console.log(`   发送提醒: ${alertCount} 个`);
+            console.log(`   冷却跳过: ${cooldownSkipped} 个`);
             this.displayRecentSymbols(timeframeConfig.interval);
             
         } catch (error) {
-            console.error(`检查${timeframeName}周期交易对时发生错误:`, error);
+            console.error(`❌ 检查${timeframeName}周期交易对时发生错误:`, error);
         } finally {
             this.isChecking.set(dataKey, false);
         }
