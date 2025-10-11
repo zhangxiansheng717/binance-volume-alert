@@ -28,42 +28,57 @@ const config = {
                 {
                     interval: '5m',
                     enabled: true,
+                    priceThreshold: parseFloat(process.env.PRICE_THRESHOLD_5M) || 2.0,      // 价格阈值 2%
                     volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_5M) || 2,
                     minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_5M) || 100000,
-                    scheduleSeconds: 3, // 在周期开始后第3秒检查
-                    historyPeriods: 6   // 历史基准周期数（30分钟）
+                    scheduleSeconds: 3,          // 在周期开始后第3秒检查
+                    historyPeriods: 6,           // 历史基准周期数（30分钟）
+                    volumeMedianPeriods: 20,     // 量能中位数计算周期
+                    cooldownMinutes: 5           // 冷却时间（分钟）
                 },
                 {
                     interval: '15m',
                     enabled: process.env.ENABLE_15M !== 'false', // 默认启用
+                    priceThreshold: parseFloat(process.env.PRICE_THRESHOLD_15M) || 3.0,     // 价格阈值 3%
                     volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_15M) || 2.5,
                     minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_15M) || 300000,
-                    scheduleSeconds: 10, // 在周期开始后第10秒检查
-                    historyPeriods: 6    // 历史基准周期数（90分钟）
+                    scheduleSeconds: 10,         // 在周期开始后第10秒检查
+                    historyPeriods: 6,           // 历史基准周期数（90分钟）
+                    volumeMedianPeriods: 20,     // 量能中位数计算周期
+                    cooldownMinutes: 5           // 冷却时间（分钟）
                 },
                 {
                     interval: '1h',
                     enabled: process.env.ENABLE_1H !== 'false', // 默认启用
+                    priceThreshold: parseFloat(process.env.PRICE_THRESHOLD_1H) || 4.0,      // 价格阈值 4%
                     volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_1H) || 3,
                     minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_1H) || 1000000,
-                    scheduleSeconds: 30, // 在周期开始后第30秒检查
-                    historyPeriods: 6    // 历史基准周期数（6小时）
+                    scheduleSeconds: 30,         // 在周期开始后第30秒检查
+                    historyPeriods: 6,           // 历史基准周期数（6小时）
+                    volumeMedianPeriods: 20,     // 量能中位数计算周期
+                    cooldownMinutes: 15          // 冷却时间（分钟）
                 },
                 {
                     interval: '4h',
                     enabled: process.env.ENABLE_4H !== 'false', // 默认启用
+                    priceThreshold: parseFloat(process.env.PRICE_THRESHOLD_4H) || 5.5,      // 价格阈值 5.5%
                     volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_4H) || 4,
                     minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_4H) || 5000000,
-                    scheduleSeconds: 120, // 在周期开始后第2分钟检查
-                    historyPeriods: 6     // 历史基准周期数（24小时）
+                    scheduleSeconds: 120,        // 在周期开始后第2分钟检查
+                    historyPeriods: 6,           // 历史基准周期数（24小时）
+                    volumeMedianPeriods: 20,     // 量能中位数计算周期
+                    cooldownMinutes: 30          // 冷却时间（分钟）
                 },
                 {
                     interval: '1d',
                     enabled: process.env.ENABLE_1D !== 'false', // 默认启用
+                    priceThreshold: parseFloat(process.env.PRICE_THRESHOLD_1D) || 8.0,      // 价格阈值 8%
                     volumeThreshold: parseFloat(process.env.VOLUME_THRESHOLD_1D) || 5,
                     minQuoteVolume: parseFloat(process.env.MIN_QUOTE_VOLUME_1D) || 10000000,
-                    scheduleSeconds: 300, // 在周期开始后第5分钟检查
-                    historyPeriods: 6     // 历史基准周期数（6天）
+                    scheduleSeconds: 300,        // 在周期开始后第5分钟检查
+                    historyPeriods: 6,           // 历史基准周期数（6天）
+                    volumeMedianPeriods: 20,     // 量能中位数计算周期
+                    cooldownMinutes: 60          // 冷却时间（分钟）
                 }
             ]
         }
@@ -118,4 +133,4 @@ try {
 } catch (error) {
     console.error('配置验证失败:', error.message);
     process.exit(1);
-} 
+}
