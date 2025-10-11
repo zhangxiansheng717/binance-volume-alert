@@ -77,11 +77,17 @@ class BinanceService {
                     const batchData = await Promise.all(
                         batch.map(async (symbol) => {
                             try {
+                                // 获取足够的K线数据：historyPeriods + volumeMedianPeriods + 2
+                                const totalLimit = Math.max(
+                                    timeframeConfig.historyPeriods + 2,
+                                    timeframeConfig.volumeMedianPeriods + 2
+                                ) + 5; // 额外5根确保数据充足
+                                
                                 const klineResponse = await axios.get(`${this.baseUrl}/klines`, {
                                     params: {
                                         symbol: symbol,
                                         interval: timeframeConfig.interval,
-                                        limit: timeframeConfig.historyPeriods + 2, // +2 确保有足够数据
+                                        limit: totalLimit,
                                     },
                                     headers,
                                     timeout: this.requestTimeout,
@@ -89,24 +95,44 @@ class BinanceService {
                                     proxy: false
                                 });
 
-                                if (klineResponse.data && klineResponse.data.length >= timeframeConfig.historyPeriods + 2) {
+                                if (klineResponse.data && klineResponse.data.length >= timeframeConfig.volumeMedianPeriods + 2) {
                                     const klines = klineResponse.data;
-                                    // 使用已完成的最新K线
-                                    const currentKline = klines[timeframeConfig.historyPeriods];
-                                    const historicalKlines = klines.slice(0, timeframeConfig.historyPeriods);
+                                    // 使用已完成的最新K线（倒数第2根）
+                                    const currentKline = klines[klines.length - 2];
+                                    
+                                    // 历史基准周期（用于平均交易量计算）
+                                    const historicalKlines = klines.slice(
+                                        Math.max(0, klines.length - 2 - timeframeConfig.historyPeriods), 
+                                        klines.length - 2
+                                    );
 
-                                    // 使用币种交易量计算
+                                    // 量能中位数计算周期（用于判断强/爆）
+                                    const volumeMedianKlines = klines.slice(
+                                        Math.max(0, klines.length - 2 - timeframeConfig.volumeMedianPeriods), 
+                                        klines.length - 2
+                                    );
+
+                                    // 使用币种交易量计算平均
                                     const avgVolume = historicalKlines.reduce((sum, kline) => 
-                                        sum + parseFloat(kline[5]), 0) / timeframeConfig.historyPeriods;
+                                        sum + parseFloat(kline[5]), 0) / historicalKlines.length;
+
+                                    // 计算量能中位数
+                                    const volumes = volumeMedianKlines.map(k => parseFloat(k[5])).sort((a, b) => a - b);
+                                    const medianVolume = volumes.length % 2 === 0
+                                        ? (volumes[volumes.length / 2 - 1] + volumes[volumes.length / 2]) / 2
+                                        : volumes[Math.floor(volumes.length / 2)];
 
                                     return {
                                         symbol: symbol,
                                         interval: timeframeConfig.interval,
-                                        volume: parseFloat(currentKline[5]),     // 使用币种交易量
-                                        lastPrice: parseFloat(currentKline[4]),
-                                        quoteVolume: parseFloat(currentKline[7]), // 保留成交额用于筛选
+                                        openPrice: parseFloat(currentKline[1]),      // K线开盘价
+                                        lastPrice: parseFloat(currentKline[4]),      // K线收盘价（当前价）
+                                        volume: parseFloat(currentKline[5]),         // 使用币种交易量
+                                        quoteVolume: parseFloat(currentKline[7]),    // 保留成交额用于筛选
                                         time: new Date(currentKline[0]).toLocaleString(),
                                         avgHistoricalVolume: avgVolume,
+                                        volumeMedian: medianVolume,                  // 量能中位数
+                                        volumeMultiplier: parseFloat(currentKline[5]) / medianVolume,  // 量能倍数
                                         timeframeConfig: timeframeConfig
                                     };
                                 }
