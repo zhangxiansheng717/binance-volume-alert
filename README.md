@@ -2,6 +2,149 @@
 
 一个用于监控币安合约市场交易量和价格变化的本地机器人，当发现交易量暴涨且价格上涨时，通过 Telegram 发送提醒。
 
+## 如何获取 Telegram 配置
+  步骤1：创建 Telegram Bot 并获取 Token
+  打开 Telegram，搜索 @BotFather
+  发送命令 /newbot
+  按提示操作：
+   - 给你的机器人起个名字：Binance Monitor Bot
+   - 给机器人设置用户名（必须以bot结尾）：binance_alert_bot
+  创建成功后，BotFather 会给你一个 Token，类似：
+     1234567888:ABCdefGHIjklMNOpqrsTUVwxyz
+  这就是你的 TELEGRAM_BOT_TOKEN ✅
+  步骤2：获取你的 Chat ID
+  在 Telegram 搜索 @userinfobot
+  点击 START 或发送任意消息
+  机器人会回复你的信息，找到 Id: 后面的数字，例如：
+     Id: 123456789
+  这就是你的 TELEGRAM_CHAT_ID ✅
+  步骤3：让你的 Bot 能给你发消息
+  在 Telegram 搜索你刚才创建的机器人（例如 @binance_alert_bot）
+  点击 START 按钮
+  现在机器人就可以给你发消息了！
+
+Telegram 配置示例:
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUuwxyz
+TELEGRAM_CHAT_ID=123456789
+USE_PROXY=false
+
+使用场景
+场景1：个人使用（最常见） ⭐
+TELEGRAM_BOT_TOKEN=1234567890:ABC...
+TELEGRAM_CHAT_ID=123456789  # ← 你的个人Chat ID
+
+场景2：发送到群组
+TELEGRAM_BOT_TOKEN=1234567890:ABC...
+TELEGRAM_CHAT_ID=-1001234567890  # ← 群组的Chat ID（负数）
+步骤：
+创建一个 Telegram 群组
+把机器人拉进群组
+获取群组的 Chat ID（负数，如 -1001234567890）
+配置到 .env 文件
+
+如何获取群组Chat ID：
+使用 @username_to_id_bot
+1. 把这个机器人拉进你的群组
+2. 它会告诉你群组的ID
+
+## 完整部署流程（适合海外服务器）
+  1. 准备环境
+   更新系统
+  sudo apt update && sudo apt upgrade -y
+  
+   安装 Node.js 18.x
+  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+  sudo apt install -y nodejs
+  
+   安装 git 和 PM2
+  sudo apt install git -y
+  sudo npm install pm2 -g
+  
+   验证安装
+  node -v    # 应该显示 v18.x.x
+  npm -v     # 应该显示 9.x.x 或更高
+  pm2 -v     # 应该显示版本号
+  
+  2. 克隆并配置项目
+   创建项目目录
+  mkdir -p /home/ubuntu/projects
+  cd /home/ubuntu/projects
+  
+   克隆项目（使用你的实际Git地址）
+  git clone https://github.com/yourusername/binance-volume-alert.git
+  cd binance-volume-alert
+  
+   安装依赖
+  npm install
+  
+   复制配置文件
+  cp .env.example .env
+  
+   编辑配置文件
+  nano .env
+
+  4. 测试配置
+   测试 Telegram 配置是否正确
+    node test-telegram.js
+    如果配置正确，你会：
+    控制台显示：测试成功！
+    Telegram 收到测试消息 ✅
+    如果出错，检查：
+    Token 是否正确（没有多余空格）
+    Chat ID 是否正确
+    是否点击了机器人的 START 按钮
+
+  5. 启动服务
+   启动监控服务
+  pm2 start src/index.js --name "binance-monitor"
+  
+   查看日志（确认正常运行）
+  pm2 logs binance-monitor
+  
+   如果正常，你会看到类似输出：
+   ⏰ 开始新一轮15分钟周期市场检查...
+   📊 15分钟周期获取到 280 个交易对，有效数据 275 个
+
+  6. 设置开机自启
+   保存当前PM2进程列表
+  pm2 save
+  
+   生成开机自启动脚本
+  pm2 startup
+  
+   复制并执行输出的命令（类似下面这样）
+  sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu
+
+  7. 常用管理命令
+   查看运行状态
+  pm2 status
+  
+   查看实时日志
+  pm2 logs binance-monitor
+  
+   查看最近100行日志
+  pm2 logs binance-monitor --lines 100
+  
+   停止服务
+  pm2 stop binance-monitor
+  
+   重启服务
+  pm2 restart binance-monitor
+  
+   删除服务
+  pm2 delete binance-monitor
+  
+   查看详细信息
+  pm2 show binance-monitor
+
+# 如果以后需要手动更新：
+  cd /home/ubuntu/projects/binance-volume-alert
+  git pull origin master  # 拉取最新代码
+  npm install             # 安装新依赖
+  pm2 restart binance-monitor  # 重启服务
+  修改了仓库代码按这个步骤来就好了
+
+
 ## 功能特点
 
 - 实时监控币安合约市场所有 USDT 交易对
