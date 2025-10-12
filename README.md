@@ -76,7 +76,7 @@ TELEGRAM_CHAT_ID=-1001234567890  # ← 群组的Chat ID（负数）```
 
 *   **更新系统**
     ```bash
-    sudo apt update && sudo apt upgrade -y
+    sudo apt update && sudo apt upgrade -y (基本用不到，直接跳过)
 ```
 
 * **安装 Node.js 18.x**
