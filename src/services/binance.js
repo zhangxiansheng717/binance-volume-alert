@@ -193,7 +193,8 @@ class BinanceService {
     async getAllSymbolData() {
         const defaultTimeframe = {
             interval: '5m',
-            historyPeriods: 6
+            historyPeriods: 6,
+            volumeMedianPeriods: 20
         };
         return this.getAllSymbolDataForTimeframe(defaultTimeframe);
     }
