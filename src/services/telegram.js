@@ -165,29 +165,48 @@ class TelegramService {
                          volumeMultiplier >= 2 ? '⚡ 放量' :
                          volumeMultiplier >= 1 ? '📊 正常' : '⚠️ 缩量';
         
-        // 动态确定小数位数
+        // 动态确定小数位数（更精确）
         const currentPrice = parseFloat(price);
         let priceDecimals = 2;
-        if (currentPrice < 0.01) {
+        if (currentPrice < 0.001) {
+            priceDecimals = 8;  // 极小币种
+        } else if (currentPrice < 0.01) {
             priceDecimals = 6;
+        } else if (currentPrice < 0.1) {
+            priceDecimals = 5;  // 0.02-0.1之间用5位
         } else if (currentPrice < 1) {
             priceDecimals = 4;
+        } else if (currentPrice < 10) {
+            priceDecimals = 3;  // 1-10之间用3位
         } else if (currentPrice < 100) {
             priceDecimals = 2;
         } else {
             priceDecimals = 1;
         }
         
-        // 智能判断支撑阻力位
-        let supportLevel, resistanceLevel;
+        // 智能判断支撑阻力位（确保支撑<当前价<阻力）
+        let supportLevel, resistanceLevel, supportLabel, resistanceLabel;
+        
+        // 简化逻辑：只用EMA作为关键参考位
         if (currentPrice > ema25) {
-            // 价格在EMA25上方 → 多头状态
-            supportLevel = ema25;           // EMA25是支撑
-            resistanceLevel = resistance;   // 前高是阻力
+            // 多头：价格在EMA25上方
+            supportLevel = ema25;
+            supportLabel = 'EMA25';
+            resistanceLevel = resistance;
+            resistanceLabel = '前高';
+        } else if (currentPrice > ema7 && currentPrice <= ema25) {
+            // 中间：价格在EMA7和EMA25之间（这种情况较少）
+            supportLevel = ema7;
+            supportLabel = 'EMA7';
+            resistanceLevel = ema25;
+            resistanceLabel = 'EMA25';
         } else {
-            // 价格在EMA25下方 → 空头状态
-            supportLevel = ema7;            // EMA7是近期支撑
-            resistanceLevel = ema25;        // EMA25是阻力
+            // 空头：价格在EMA7下方（极弱）
+            // 显示最近的反弹目标
+            supportLevel = currentPrice * 0.95;  // 下方5%作为参考
+            supportLabel = '近期低位';
+            resistanceLevel = Math.min(ema7, ema25);
+            resistanceLabel = resistanceLevel === ema7 ? 'EMA7' : 'EMA25';
         }
         
         // 综合评级（更严格的逻辑）
@@ -201,57 +220,57 @@ class TelegramService {
             if (trend === 'up' && volumeMultiplier >= 2 && rsi >= 40 && rsi < 70) {
                 rating = 'A';
                 ratingEmoji = '✅';
-                suggestion = '做多';
-                reasons.push('✓ 顺势上涨（多头排列）');
-                reasons.push('✓ 放量配合（量能充足）');
-                reasons.push('✓ RSI健康（未超买）');
+                suggestion = '可以做多';
+                reasons.push('✓ 顺势上涨（多头趋势）');
+                reasons.push('✓ 放量配合（资金进场）');
+                reasons.push('✓ RSI健康（还有空间）');
             }
             // B级：有一定优势但不完美
             else if (trend === 'up' && volumeMultiplier >= 1.5 && rsi < 75) {
                 rating = 'B';
                 ratingEmoji = '📊';
-                suggestion = '可关注';
-                reasons.push('✓ 趋势向上（多头排列）');
-                if (volumeMultiplier < 2) reasons.push('⚠ 量能一般（未达2倍）');
-                if (rsi >= 70) reasons.push('⚠ RSI偏高（注意回调）');
+                suggestion = '可以关注';
+                reasons.push('✓ 趋势向上（多头趋势）');
+                if (volumeMultiplier < 2) reasons.push('⚠ 量能一般（资金不多）');
+                if (rsi >= 70) reasons.push('⚠ RSI偏高（小心回调）');
             }
             // C级：RSI超买或量能不足或逆势
             else {
                 rating = 'C';
                 ratingEmoji = '⚠️';
-                suggestion = '谨慎追高';
-                if (trend === 'down') reasons.push('✗ 逆势反弹（空头排列）');
-                if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（缩量上涨）');
-                if (rsi >= 75) reasons.push('✗ RSI超买（回调风险）');
-                if (rsi < 40) reasons.push('✗ RSI偏弱（反弹无力）');
+                suggestion = '不建议追高';
+                if (trend === 'down') reasons.push('✗ 逆势反弹（下跌趋势中）');
+                if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（没人买）');
+                if (rsi >= 75) reasons.push('✗ RSI超买（容易回调）');
+                if (rsi < 40) reasons.push('✗ RSI太弱（涨不动）');
             }
         } else {  // 下跌
             // A级：超卖反弹机会
             if (rsi <= 30 && volumeMultiplier >= 2 && trend === 'down') {
                 rating = 'A';
                 ratingEmoji = '💡';
-                suggestion = '关注反弹';
-                reasons.push('✓ RSI超卖（反弹概率大）');
-                reasons.push('✓ 放量下跌（恐慌盘出清）');
-                reasons.push('✓ 已有下跌趋势（超跌反弹）');
+                suggestion = '可抄底';
+                reasons.push('✓ RSI超卖（跌过头了）');
+                reasons.push('✓ 放量下跌（恐慌抛售）');
+                reasons.push('✓ 可能反弹（超跌后易反弹）');
             }
             // B级：接近超卖
             else if (rsi <= 40 && volumeMultiplier >= 1.5) {
                 rating = 'B';
                 ratingEmoji = '📊';
-                suggestion = '观察抄底';
-                reasons.push('✓ RSI偏低（接近超卖）');
-                if (volumeMultiplier >= 2) reasons.push('✓ 放量下跌（可能见底）');
-                if (trend === 'up') reasons.push('⚠ 多头趋势被破坏');
+                suggestion = '可观察';
+                reasons.push('✓ RSI偏低（接近超跌）');
+                if (volumeMultiplier >= 2) reasons.push('✓ 放量下跌（可能快见底）');
+                if (trend === 'up') reasons.push('⚠ 上涨趋势被打破');
             }
             // C级：继续下跌风险
             else {
                 rating = 'C';
                 ratingEmoji = '⚠️';
-                suggestion = '等待企稳';
-                if (rsi > 50) reasons.push('✗ RSI未超卖（还能跌）');
-                if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（阴跌不止）');
-                if (trend === 'down') reasons.push('✗ 空头趋势（下跌未完）');
+                suggestion = '先别买';
+                if (rsi > 50) reasons.push('✗ RSI还高（还会跌）');
+                if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（慢慢阴跌）');
+                if (trend === 'down') reasons.push('✗ 下跌趋势（跌势未完）');
             }
         }
         
@@ -271,15 +290,10 @@ class TelegramService {
         message += `• EMA7: ${ema7.toFixed(priceDecimals)} | EMA25: ${ema25.toFixed(priceDecimals)}\n`;
         message += `• 量能: ${volumeTag} ${volumeMultiplier.toFixed(1)}x\n\n`;
         
-        // 参考位置（根据价格和EMA关系动态显示）
+        // 参考位置（智能判断最接近的支撑阻力）
         message += `💰 参考位置:\n`;
-        if (currentPrice > ema25) {
-            message += `• 支撑位: $${supportLevel.toFixed(priceDecimals)} (EMA25)\n`;
-            message += `• 阻力位: $${resistanceLevel.toFixed(priceDecimals)} (前高)\n\n`;
-        } else {
-            message += `• 支撑位: $${supportLevel.toFixed(priceDecimals)} (EMA7)\n`;
-            message += `• 阻力位: $${resistanceLevel.toFixed(priceDecimals)} (EMA25)\n\n`;
-        }
+        message += `• 支撑位: $${supportLevel.toFixed(priceDecimals)} (${supportLabel})\n`;
+        message += `• 阻力位: $${resistanceLevel.toFixed(priceDecimals)} (${resistanceLabel})\n\n`;
         
         // 综合评级
         message += `💡 综合评级: ${rating}级信号\n`;
