@@ -12,13 +12,13 @@
   创建成功后，BotFather 会给你一个 Token，类似：
      1234567888:ABCdefGHIjklMNOpqrsTUVwxyz
   这就是你的 TELEGRAM_BOT_TOKEN ✅
-  步骤2：获取你的 Chat ID
+  -步骤2：获取你的 Chat ID
   在 Telegram 搜索 @userinfobot
   点击 START 或发送任意消息
   机器人会回复你的信息，找到 Id: 后面的数字，例如：
      Id: 123456789
   这就是你的 TELEGRAM_CHAT_ID ✅
-  步骤3：让你的 Bot 能给你发消息
+  -步骤3：让你的 Bot 能给你发消息
   在 Telegram 搜索你刚才创建的机器人（例如 @binance_alert_bot）
   点击 START 按钮
   现在机器人就可以给你发消息了！
