@@ -161,10 +161,17 @@ class TelegramService {
         };
         const intervalDisplay = `${intervalEmoji[interval] || '⚫'} ${interval}`;
         
-        // RSI状态
-        const rsiStatus = rsi >= 70 ? '⚠️ 超买' : 
-                         rsi <= 30 ? '💡 超卖' : 
-                         rsi >= 50 ? '✅ 强势' : '📊 弱势';
+        // RSI状态（根据涨跌方向判断）
+        let rsiStatus;
+        if (priceChange > 0) {  // 上涨时
+            rsiStatus = rsi >= 70 ? '⚠️ 超买' : 
+                       rsi >= 50 ? '✅ 强势' : 
+                       rsi >= 30 ? '📊 中性' : '💡 超卖';
+        } else {  // 下跌时
+            rsiStatus = rsi >= 70 ? '⚠️ 仍偏强' : 
+                       rsi >= 50 ? '📊 未超卖' : 
+                       rsi >= 30 ? '💡 接近超卖' : '💡 超卖';
+        }
         
         // 趋势显示
         const trendEmoji = trend === 'up' ? '🚀' : '📉';
@@ -260,7 +267,7 @@ class TelegramService {
             }
         } else {  // 下跌
             // A级：超卖反弹机会
-            if (rsi <= 30 && volumeMultiplier >= 2 && trend === 'down') {
+            if (rsi <= 30 && volumeMultiplier >= 2) {
                 rating = 'A';
                 ratingEmoji = '💡';
                 suggestion = '可抄底';
@@ -268,23 +275,28 @@ class TelegramService {
                 reasons.push('✓ 放量下跌（恐慌抛售）');
                 reasons.push('✓ 可能反弹（超跌后易反弹）');
             }
-            // B级：接近超卖
-            else if (rsi <= 40 && volumeMultiplier >= 1.5) {
+            // B级：多头回调或接近超卖
+            else if ((trend === 'up' && rsi >= 40 && rsi <= 65) || (rsi <= 40 && volumeMultiplier >= 1.5)) {
                 rating = 'B';
                 ratingEmoji = '📊';
                 suggestion = '可观察';
-                reasons.push('✓ RSI偏低（接近超跌）');
-                if (volumeMultiplier >= 2) reasons.push('✓ 放量下跌（可能快见底）');
-                if (trend === 'up') reasons.push('⚠ 上涨趋势被打破');
+                if (trend === 'up' && rsi >= 40) {
+                    reasons.push('✓ 多头回调（趋势未变）');
+                    reasons.push('✓ RSI未超卖（健康调整）');
+                    if (volumeMultiplier >= 1.5) reasons.push('✓ 有一定量能（调整中）');
+                } else {
+                    reasons.push('✓ RSI偏低（接近超跌）');
+                    if (volumeMultiplier >= 2) reasons.push('✓ 放量下跌（可能快见底）');
+                }
             }
             // C级：继续下跌风险
             else {
                 rating = 'C';
                 ratingEmoji = '⚠️';
                 suggestion = '先别买';
-                if (rsi > 50) reasons.push('✗ RSI还高（还会跌）');
+                if (rsi > 65) reasons.push('✗ RSI偏高（还会跌）');
                 if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（慢慢阴跌）');
-                if (trend === 'down') reasons.push('✗ 下跌趋势（跌势未完）');
+                if (trend === 'down' && rsi > 50) reasons.push('✗ 空头趋势（跌势未完）');
             }
         }
         
