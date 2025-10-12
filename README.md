@@ -72,13 +72,6 @@ TELEGRAM_CHAT_ID=-1001234567890  # ← 群组的Chat ID（负数）```
 
 ## 完整部署流程（适合海外服务器）
 
-### 1. 准备环境
-
-*   **更新系统**
-    ```bash
-    sudo apt update && sudo apt upgrade -y
-```
-
 * **安装 Node.js 18.x**
 
   ```bash
