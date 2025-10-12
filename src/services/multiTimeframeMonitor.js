@@ -274,7 +274,14 @@ class MultiTimeframeMonitorService {
                     interval: timeframeConfig.interval,
                     threshold: timeframeConfig.priceThreshold,
                     volumeMultiplier: data.volumeMultiplier,
-                    cooldownMinutes: timeframeConfig.cooldownMinutes
+                    cooldownMinutes: timeframeConfig.cooldownMinutes,
+                    // 技术指标
+                    rsi: data.rsi,
+                    ema7: data.ema7,
+                    ema25: data.ema25,
+                    atr: data.atr,
+                    trend: data.trend,
+                    resistance: data.resistance
                 });
                 
                 if (sent) {
