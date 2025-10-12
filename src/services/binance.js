@@ -260,7 +260,16 @@ class BinanceService {
             ema = (price - ema) * multiplier + ema;
         }
         
-        return Math.round(ema * 100) / 100;
+        // 根据价格大小返回合适精度
+        if (ema < 0.001) {
+            return Math.round(ema * 100000000) / 100000000; // 8位小数
+        } else if (ema < 0.01) {
+            return Math.round(ema * 1000000) / 1000000; // 6位小数
+        } else if (ema < 1) {
+            return Math.round(ema * 100000) / 100000; // 5位小数
+        } else {
+            return Math.round(ema * 100) / 100; // 2位小数
+        }
     }
 
     // 计算ATR指标
