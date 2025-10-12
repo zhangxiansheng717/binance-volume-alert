@@ -122,6 +122,21 @@ class BinanceService {
                                         ? (volumes[volumes.length / 2 - 1] + volumes[volumes.length / 2]) / 2
                                         : volumes[Math.floor(volumes.length / 2)];
 
+                                    // 计算技术指标
+                                    const allKlines = klines.slice(0, klines.length - 1);
+                                    const rsi = this.calculateRSI(allKlines, 14);
+                                    const ema7 = this.calculateEMA(allKlines, 7);
+                                    const ema25 = this.calculateEMA(allKlines, 25);
+                                    const atr = this.calculateATR(allKlines, 14);
+                                    
+                                    // 判断趋势
+                                    const trend = ema7 > ema25 ? 'up' : 'down';
+                                    
+                                    // 找前高作为阻力位
+                                    const recentHighs = klines.slice(Math.max(0, klines.length - 20), klines.length - 1)
+                                        .map(k => parseFloat(k[2]));
+                                    const resistance = Math.max(...recentHighs);
+
                                     return {
                                         symbol: symbol,
                                         interval: timeframeConfig.interval,
@@ -133,6 +148,12 @@ class BinanceService {
                                         avgHistoricalVolume: avgVolume,
                                         volumeMedian: medianVolume,                  // 量能中位数
                                         volumeMultiplier: parseFloat(currentKline[5]) / medianVolume,  // 量能倍数
+                                        rsi: rsi,                                    // RSI指标
+                                        ema7: ema7,                                  // EMA7
+                                        ema25: ema25,                                // EMA25
+                                        atr: atr,                                    // ATR
+                                        trend: trend,                                // 趋势方向
+                                        resistance: resistance,                      // 阻力位
                                         timeframeConfig: timeframeConfig
                                     };
                                 }
@@ -192,6 +213,75 @@ class BinanceService {
             timestamp: now
         });
         return symbols;
+    }
+
+    // 计算RSI指标
+    calculateRSI(klines, period = 14) {
+        if (klines.length < period + 1) return 50;
+        
+        let gains = 0, losses = 0;
+        
+        for (let i = klines.length - period; i < klines.length; i++) {
+            if (i === 0) continue;
+            const change = parseFloat(klines[i][4]) - parseFloat(klines[i-1][4]);
+            if (change > 0) gains += change;
+            else losses += Math.abs(change);
+        }
+        
+        let avgGain = gains / period;
+        let avgLoss = losses / period;
+        
+        if (avgLoss === 0) return 100;
+        
+        const rs = avgGain / avgLoss;
+        const rsi = 100 - (100 / (1 + rs));
+        
+        return Math.round(rsi * 100) / 100;
+    }
+
+    // 计算EMA指标
+    calculateEMA(klines, period) {
+        if (klines.length < period) return parseFloat(klines[klines.length-1][4]);
+        
+        const multiplier = 2 / (period + 1);
+        const start = Math.max(0, klines.length - period * 3);
+        
+        let ema = 0;
+        const smaStart = start;
+        const smaEnd = smaStart + period;
+        for (let i = smaStart; i < smaEnd && i < klines.length; i++) {
+            ema += parseFloat(klines[i][4]);
+        }
+        ema = ema / period;
+        
+        for (let i = smaEnd; i < klines.length; i++) {
+            const price = parseFloat(klines[i][4]);
+            ema = (price - ema) * multiplier + ema;
+        }
+        
+        return Math.round(ema * 100) / 100;
+    }
+
+    // 计算ATR指标
+    calculateATR(klines, period = 14) {
+        if (klines.length < period + 1) return 0;
+        
+        let trSum = 0;
+        for (let i = Math.max(1, klines.length - period); i < klines.length; i++) {
+            const high = parseFloat(klines[i][2]);
+            const low = parseFloat(klines[i][3]);
+            const prevClose = parseFloat(klines[i-1][4]);
+            
+            const tr = Math.max(
+                high - low,
+                Math.abs(high - prevClose),
+                Math.abs(low - prevClose)
+            );
+            trSum += tr;
+        }
+        
+        const atr = trSum / Math.min(period, klines.length - 1);
+        return Math.round(atr * 100) / 100;
     }
 }
 
