@@ -100,7 +100,8 @@ class TelegramService {
     }
 
     async sendAlert(alertData) {
-        const { symbol, price, priceChange, interval, threshold, volumeMultiplier, cooldownMinutes } = alertData;
+        const { symbol, price, priceChange, interval, threshold, volumeMultiplier, cooldownMinutes,
+                rsi, ema7, ema25, atr, trend, resistance } = alertData;
         
         // 判断涨跌方向
         const direction = priceChange >= 0 ? '上涨' : '下跌';
@@ -134,32 +135,93 @@ class TelegramService {
             hour12: false 
         }).replace(/\//g, '-');
         
-        // 格式化价格（添加千位分隔符）
+        // 格式化价格
         const formattedPrice = parseFloat(price).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 8
         });
         
-        // 构建消息（根据是否显示强度行）
+        // 周期颜色标识
+        const intervalEmoji = {
+            '5m': '🔴',
+            '15m': '🟡',
+            '1h': '🟢',
+            '4h': '🔵',
+            '1d': '⚪'
+        };
+        const intervalDisplay = `${intervalEmoji[interval] || '⚫'} ${interval}`;
+        
+        // RSI状态
+        const rsiStatus = rsi >= 70 ? '⚠️ 超买' : 
+                         rsi <= 30 ? '💡 超卖' : 
+                         rsi >= 50 ? '✅ 强势' : '📊 弱势';
+        
+        // 趋势显示
+        const trendEmoji = trend === 'up' ? '🚀' : '📉';
+        const trendText = trend === 'up' ? '多头排列' : '空头排列';
+        
+        // 量能等级
+        const volumeTag = volumeMultiplier >= 3 ? '💥 爆量' :
+                         volumeMultiplier >= 2 ? '⚡ 放量' :
+                         volumeMultiplier >= 1 ? '📊 正常' : '⚠️ 缩量';
+        
+        // 支撑位（EMA25）
+        const support = ema25;
+        
+        // 综合评级
+        let rating = 'B';
+        let ratingEmoji = '⚠️';
+        let suggestion = '观望';
+        
+        if (priceChange > 0) {  // 上涨
+            if (rsi < 70 && volumeMultiplier >= 2 && trend === 'up') {
+                rating = 'A';
+                ratingEmoji = '✅';
+                suggestion = '做多';
+            } else if (rsi >= 80) {
+                rating = 'C';
+                ratingEmoji = '⚠️';
+                suggestion = '谨慎追高';
+            }
+        } else {  // 下跌
+            if (rsi <= 30 && volumeMultiplier >= 2) {
+                rating = 'B';
+                ratingEmoji = '💡';
+                suggestion = '关注反弹';
+            }
+        }
+        
+        // 构建消息
         const countText = ` 第${alertCount}次提醒`;
         let message = `📊 合约价格异动提醒（${symbol}${countText}）\n\n`;
         message += `交易对: ${symbol}\n`;
-        message += `周期: ${interval}\n`;
+        message += `周期: ${intervalDisplay}\n`;
         message += `变动幅度: ${changeSymbol}${Math.abs(priceChange).toFixed(2)}% (${direction})\n`;
         message += `阈值: ${threshold}%\n`;
+        message += `当前价格: ${formattedPrice}\n\n`;
         
-        // 只有达标时才显示强度行
-        if (intensity.show) {
-            message += `强度: ${intensity.tag} x${intensity.x}\n`;
-        }
+        // 技术分析
+        message += `📈 技术分析:\n`;
+        message += `• RSI(14): ${rsi.toFixed(0)} ${rsiStatus}\n`;
+        message += `• MA趋势: ${trendEmoji} ${trendText}\n`;
+        message += `• EMA7: ${ema7.toFixed(2)} | EMA25: ${ema25.toFixed(2)}\n`;
+        message += `• 量能: ${volumeTag} ${volumeMultiplier.toFixed(1)}x\n`;
+        message += `• ATR: ${atr.toFixed(2)} (参考止损距离)\n\n`;
         
-        message += `当前价格: ${formattedPrice}\n`;
+        // 参考位置
+        message += `💰 参考位置:\n`;
+        message += `• 支撑位: $${support.toFixed(2)} (EMA25)\n`;
+        message += `• 阻力位: $${resistance.toFixed(2)} (前高)\n\n`;
+        
+        // 综合评级
+        message += `💡 综合评级: ${rating}级信号\n`;
+        message += `${ratingEmoji} 建议方向: ${suggestion}\n\n`;
+        
         message += `时间: ${timeStr}`;
 
         try {
             await this.bot.sendMessage(this.chatId, message, {
-                // 根据强度等级设置通知优先级
-                disable_notification: intensity.level === 'threshold'  // 仅超阈静默
+                disable_notification: intensity.level === 'threshold'
             });
             
             const intensityDesc = intensity.show ? `${intensity.tag} x${intensity.x}` : '仅超阈';
