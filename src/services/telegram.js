@@ -123,23 +123,33 @@ class TelegramService {
         // 记录提醒时间（启动冷却）
         this.recordAlertTime(symbol, interval, directionKey);
         
-        // 格式化时间
+        // 格式化时间（手动格式化，确保24小时制）
         const now = new Date();
-        const timeStr = now.toLocaleString('zh-CN', { 
-            year: 'numeric',
-            month: '2-digit', 
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false 
-        }).replace(/\//g, '-');
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');  // 24小时制
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const second = String(now.getSeconds()).padStart(2, '0');
+        const timeStr = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
         
-        // 格式化价格
-        const formattedPrice = parseFloat(price).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 8
-        });
+        // 格式化价格（保留完整精度）
+        const priceValue = parseFloat(price);
+        let formattedPrice;
+        if (priceValue < 0.001) {
+            formattedPrice = priceValue.toFixed(8);
+        } else if (priceValue < 0.01) {
+            formattedPrice = priceValue.toFixed(6);
+        } else if (priceValue < 1) {
+            formattedPrice = priceValue.toFixed(4);
+        } else if (priceValue < 1000) {
+            formattedPrice = priceValue.toFixed(2);
+        } else {
+            formattedPrice = priceValue.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
         
         // 周期颜色标识
         const intervalEmoji = {
@@ -165,48 +175,52 @@ class TelegramService {
                          volumeMultiplier >= 2 ? '⚡ 放量' :
                          volumeMultiplier >= 1 ? '📊 正常' : '⚠️ 缩量';
         
-        // 动态确定小数位数（更精确）
+        // 动态确定小数位数（根据价格大小）
         const currentPrice = parseFloat(price);
         let priceDecimals = 2;
         if (currentPrice < 0.001) {
-            priceDecimals = 8;  // 极小币种
+            priceDecimals = 8;  // 极小币种 0.00012345
         } else if (currentPrice < 0.01) {
-            priceDecimals = 6;
+            priceDecimals = 6;  // 0.001-0.01: 0.003910
         } else if (currentPrice < 0.1) {
-            priceDecimals = 5;  // 0.02-0.1之间用5位
+            priceDecimals = 5;  // 0.01-0.1: 0.03910
         } else if (currentPrice < 1) {
-            priceDecimals = 4;
+            priceDecimals = 4;  // 0.1-1: 0.3910
         } else if (currentPrice < 10) {
-            priceDecimals = 3;  // 1-10之间用3位
+            priceDecimals = 3;  // 1-10: 3.910
         } else if (currentPrice < 100) {
-            priceDecimals = 2;
+            priceDecimals = 2;  // 10-100: 39.10
         } else {
-            priceDecimals = 1;
+            priceDecimals = 1;  // >100: 391.0
         }
+        
+        // 确保EMA值也使用相同精度（防止显示0）
+        const ema7Display = ema7 > 0 ? ema7 : currentPrice;
+        const ema25Display = ema25 > 0 ? ema25 : currentPrice;
         
         // 智能判断支撑阻力位（确保支撑<当前价<阻力）
         let supportLevel, resistanceLevel, supportLabel, resistanceLabel;
         
         // 简化逻辑：只用EMA作为关键参考位
-        if (currentPrice > ema25) {
+        if (currentPrice > ema25Display) {
             // 多头：价格在EMA25上方
-            supportLevel = ema25;
+            supportLevel = ema25Display;
             supportLabel = 'EMA25';
             resistanceLevel = resistance;
             resistanceLabel = '前高';
-        } else if (currentPrice > ema7 && currentPrice <= ema25) {
-            // 中间：价格在EMA7和EMA25之间（这种情况较少）
-            supportLevel = ema7;
+        } else if (currentPrice > ema7Display && currentPrice <= ema25Display) {
+            // 中间：价格在EMA7和EMA25之间
+            supportLevel = ema7Display;
             supportLabel = 'EMA7';
-            resistanceLevel = ema25;
+            resistanceLevel = ema25Display;
             resistanceLabel = 'EMA25';
         } else {
             // 空头：价格在EMA7下方（极弱）
             // 显示最近的反弹目标
             supportLevel = currentPrice * 0.95;  // 下方5%作为参考
             supportLabel = '近期低位';
-            resistanceLevel = Math.min(ema7, ema25);
-            resistanceLabel = resistanceLevel === ema7 ? 'EMA7' : 'EMA25';
+            resistanceLevel = Math.min(ema7Display, ema25Display);
+            resistanceLabel = resistanceLevel === ema7Display ? 'EMA7' : 'EMA25';
         }
         
         // 综合评级（更严格的逻辑）
@@ -241,7 +255,7 @@ class TelegramService {
                 suggestion = '不建议追高';
                 if (trend === 'down') reasons.push('✗ 逆势反弹（下跌趋势中）');
                 if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（没人买）');
-                if (rsi >= 75) reasons.push('✗ RSI超买（容易回调）');
+                if (rsi >= 70) reasons.push('✗ RSI超买（容易回调）');
                 if (rsi < 40) reasons.push('✗ RSI太弱（涨不动）');
             }
         } else {  // 下跌
@@ -287,7 +301,7 @@ class TelegramService {
         message += `📈 技术分析:\n`;
         message += `• RSI(14): ${rsi.toFixed(0)} ${rsiStatus}\n`;
         message += `• MA趋势: ${trendEmoji} ${trendText}\n`;
-        message += `• EMA7: ${ema7.toFixed(priceDecimals)} | EMA25: ${ema25.toFixed(priceDecimals)}\n`;
+        message += `• EMA7: ${ema7Display.toFixed(priceDecimals)} | EMA25: ${ema25Display.toFixed(priceDecimals)}\n`;
         message += `• 量能: ${volumeTag} ${volumeMultiplier.toFixed(1)}x\n\n`;
         
         // 参考位置（智能判断最接近的支撑阻力）
