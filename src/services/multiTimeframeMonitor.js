@@ -186,9 +186,14 @@ class MultiTimeframeMonitorService {
         return data && 
                typeof data.volume === 'number' && 
                typeof data.lastPrice === 'number' &&
+               typeof data.openPrice === 'number' &&
                typeof data.avgHistoricalVolume === 'number' &&
+               typeof data.rsi === 'number' &&
+               typeof data.ema7 === 'number' &&
+               typeof data.ema25 === 'number' &&
                data.volume > 0 &&
                data.lastPrice > 0 &&
+               data.openPrice > 0 &&
                data.avgHistoricalVolume > 0;
     }
 
