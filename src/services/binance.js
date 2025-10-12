@@ -240,36 +240,29 @@ class BinanceService {
         return Math.round(rsi * 100) / 100;
     }
 
-    // 计算EMA指标
+    // 计算EMA指标（优化精度处理）
     calculateEMA(klines, period) {
-        if (klines.length < period) return parseFloat(klines[klines.length-1][4]);
+        if (!klines || klines.length < period) {
+            return klines && klines.length > 0 ? parseFloat(klines[klines.length-1][4]) : 0;
+        }
         
         const multiplier = 2 / (period + 1);
-        const start = Math.max(0, klines.length - period * 3);
         
-        let ema = 0;
-        const smaStart = start;
-        const smaEnd = smaStart + period;
-        for (let i = smaStart; i < smaEnd && i < klines.length; i++) {
-            ema += parseFloat(klines[i][4]);
+        // 先计算初始SMA
+        let sum = 0;
+        for (let i = 0; i < period; i++) {
+            sum += parseFloat(klines[i][4]);
         }
-        ema = ema / period;
+        let ema = sum / period;
         
-        for (let i = smaEnd; i < klines.length; i++) {
+        // 然后计算EMA
+        for (let i = period; i < klines.length; i++) {
             const price = parseFloat(klines[i][4]);
             ema = (price - ema) * multiplier + ema;
         }
         
-        // 根据价格大小返回合适精度
-        if (ema < 0.001) {
-            return Math.round(ema * 100000000) / 100000000; // 8位小数
-        } else if (ema < 0.01) {
-            return Math.round(ema * 1000000) / 1000000; // 6位小数
-        } else if (ema < 1) {
-            return Math.round(ema * 100000) / 100000; // 5位小数
-        } else {
-            return Math.round(ema * 100) / 100; // 2位小数
-        }
+        // 直接返回，不做精度截断（保留完整精度）
+        return ema;
     }
 
     // 计算ATR指标
