@@ -234,7 +234,9 @@ class TelegramService {
         let rating = 'C';
         let ratingEmoji = '⚠️';
         let suggestion = '观望';
-        let reasons = [];  // 评级原因
+        let detailedReasons = [];  // 详细原因
+        let operationTips = [];    // 操作建议
+        let riskWarning = '';      // 风险警示
         
         if (priceChange > 0) {  // 上涨
             // A级：趋势+量能+RSI都配合
@@ -242,28 +244,122 @@ class TelegramService {
                 rating = 'A';
                 ratingEmoji = '✅';
                 suggestion = '可以做多';
-                reasons.push('✓ 顺势上涨（多头趋势）');
-                reasons.push('✓ 放量配合（资金进场）');
-                reasons.push('✓ RSI健康（还有空间）');
+                
+                detailedReasons.push(`✓ 顺势上涨：价格沿着上涨趋势运行，不是乱涨`);
+                detailedReasons.push(`✓ 真实买盘：成交量是平时的${volumeMultiplier.toFixed(1)}倍，有真金白银在买入`);
+                detailedReasons.push(`✓ 还有空间：RSI只有${rsi.toFixed(0)}，离超买(70)还远，后续还能涨`);
+                
+                operationTips.push(`• 入场点：当前价附近 (${formattedPrice})`);
+                operationTips.push(`• 止损位：跌破支撑 ${supportLevel.toFixed(priceDecimals)}`);
+                operationTips.push(`• 目标位：阻力位 ${resistanceLevel.toFixed(priceDecimals)}`);
+                operationTips.push(`• 仓位：建议10-20%试探性建仓`);
             }
             // B级：有一定优势但不完美
             else if (trend === 'up' && volumeMultiplier >= 1.5 && rsi < 75) {
                 rating = 'B';
                 ratingEmoji = '📊';
                 suggestion = '可以关注';
-                reasons.push('✓ 趋势向上（多头趋势）');
-                if (volumeMultiplier < 2) reasons.push('⚠ 量能一般（资金不多）');
-                if (rsi >= 70) reasons.push('⚠ RSI偏高（小心回调）');
+                
+                detailedReasons.push(`✓ 趋势向上：整体是多头趋势`);
+                if (volumeMultiplier >= 2) {
+                    detailedReasons.push(`✓ 量能尚可：成交量${volumeMultiplier.toFixed(1)}倍，有一定资金`);
+                } else {
+                    detailedReasons.push(`⚠ 量能一般：成交量${volumeMultiplier.toFixed(1)}倍，追高需谨慎`);
+                }
+                if (rsi >= 70) {
+                    detailedReasons.push(`⚠ RSI偏高：RSI ${rsi.toFixed(0)}接近超买，注意回调`);
+                }
+                
+                operationTips.push(`• 建议：等待回调到支撑位再考虑`);
+                operationTips.push(`• 支撑位：${supportLevel.toFixed(priceDecimals)}`);
             }
-            // C级：RSI超买或量能不足或逆势
+            // C级：有明显风险
             else {
                 rating = 'C';
                 ratingEmoji = '⚠️';
                 suggestion = '不建议追高';
-                if (trend === 'down') reasons.push('✗ 逆势反弹（下跌趋势中）');
-                if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（没人买）');
-                if (rsi >= 70) reasons.push('✗ RSI超买（容易回调）');
-                if (rsi < 40) reasons.push('✗ RSI太弱（涨不动）');
+                
+                if (trend === 'down') {
+                    detailedReasons.push(`✗ 逆势反弹：整体趋势是下跌，这只是临时反弹`);
+                }
+                if (volumeMultiplier < 1.5) {
+                    detailedReasons.push(`✗ 量能很弱：成交量只有${volumeMultiplier.toFixed(1)}倍，买盘不足`);
+                    
+                    // 智能警示系统（根据不同情况生成针对性警示）
+                    const priceChangeAbs = Math.abs(priceChange);
+                    
+                    // 场景1：庄家对敲拉盘（大涨幅+小量能）
+                    if (priceChangeAbs > 10 && volumeMultiplier < 1.3) {
+                        riskWarning = `⚠️ 庄家对敲警示:\n`;
+                        riskWarning += `涨幅${priceChangeAbs.toFixed(1)}%但量能只有${volumeMultiplier.toFixed(1)}倍，这是典型的庄家对敲操作：\n`;
+                        riskWarning += `• 庄家用很少的钱（左手倒右手）拉高价格\n`;
+                        riskWarning += `• 制造"暴涨"假象，吸引散户FOMO追高\n`;
+                        riskWarning += `• 散户一买入，庄家立刻砸盘出货\n`;
+                        riskWarning += `• 结果：您会被套在山顶，庄家全身而退\n`;
+                        riskWarning += `💀 风险等级：极高 - 强烈建议远离！`;
+                    }
+                    // 场景2：中等涨幅但量能衰减
+                    else if (priceChangeAbs >= 6 && priceChangeAbs <= 10 && volumeMultiplier < 1.5) {
+                        riskWarning = `⚠️ 追高风险警示:\n`;
+                        riskWarning += `涨幅${priceChangeAbs.toFixed(1)}%但量能只有${volumeMultiplier.toFixed(1)}倍，说明：\n`;
+                        riskWarning += `• 前期可能有资金拉升，但现在买盘在减弱\n`;
+                        riskWarning += `• 主力可能已经不买了，现在是散户在接盘\n`;
+                        riskWarning += `• 这种情况往往是惯性上涨的尾声\n`;
+                        riskWarning += `💡 建议：等回调再考虑，别追高接盘`;
+                    }
+                    // 场景3：缩量拉升（量能<1x）
+                    else if (volumeMultiplier < 1.0) {
+                        riskWarning = `⚠️ 缩量上涨警示:\n`;
+                        riskWarning += `成交量${volumeMultiplier.toFixed(1)}倍，比平时还少！说明：\n`;
+                        riskWarning += `• 几乎没有真实买盘，可能是盘子太小随便拉\n`;
+                        riskWarning += `• 或者是自动交易机器人在做市\n`;
+                        riskWarning += `• 这种涨法不健康，随时可能反转\n`;
+                        riskWarning += `💡 建议：别碰，流动性太差`;
+                    }
+                }
+                
+                // 场景4：逆势暴涨（空头+大涨幅）
+                if (trend === 'down' && priceChangeAbs > 8) {
+                    if (!riskWarning) {  // 如果还没有警示
+                        riskWarning = `⚠️ 逆势暴涨警示:\n`;
+                        riskWarning += `下跌趋势中突然暴涨${priceChangeAbs.toFixed(1)}%，这通常是：\n`;
+                        riskWarning += `• 庄家诱多：利用散户抄底心理，拉高出货\n`;
+                        riskWarning += `• 短暂反弹：下跌趋势未改，反弹很快结束\n`;
+                        riskWarning += `• 多头陷阱：诱使散户做多，然后继续下跌\n`;
+                        riskWarning += `💡 建议：不要被假突破迷惑，等趋势真正转多再说`;
+                    }
+                }
+                
+                // 场景5：超买追高（RSI>85）
+                if (rsi >= 85 && !riskWarning) {
+                    riskWarning = `⚠️ 超买追高警示:\n`;
+                    riskWarning += `RSI高达${rsi.toFixed(0)}，严重超买！说明：\n`;
+                    riskWarning += `• 短期涨幅过大，价格已经透支\n`;
+                    riskWarning += `• 随时会出现技术性回调（5-15%的跌幅）\n`;
+                    riskWarning += `• 现在追高就是"最后一棒"，风险极大\n`;
+                    riskWarning += `💡 建议：千万别追！等回调到RSI 50以下再考虑`;
+                }
+                
+                // 场景6：小币种异常（价格<0.1 + 大涨幅）
+                if (currentPrice < 0.1 && priceChangeAbs > 12 && !riskWarning) {
+                    riskWarning = `⚠️ 小币种风险警示:\n`;
+                    riskWarning += `小币种（价格${formattedPrice}）暴涨${priceChangeAbs.toFixed(1)}%：\n`;
+                    riskWarning += `• 小币种盘子小，容易被操纵\n`;
+                    riskWarning += `• 流动性差，买得进卖不出\n`;
+                    riskWarning += `• 暴涨暴跌是常态，风险极高\n`;
+                    riskWarning += `💡 建议：新手远离小币种，专注主流币`;
+                }
+                if (rsi >= 70) {
+                    detailedReasons.push(`✗ RSI超买：RSI高达${rsi.toFixed(0)}，已经超买，随时回调`);
+                }
+                if (rsi < 40) {
+                    detailedReasons.push(`✗ RSI太弱：RSI只有${rsi.toFixed(0)}，上涨动能不足`);
+                }
+                
+                operationTips.push(`• 建议：远离这个币，等趋势明确再说`);
+                if (volumeMultiplier < 1.5 && Math.abs(priceChange) > 8) {
+                    operationTips.push(`• 警告：这种涨法很危险，十有八九是诱多`);
+                }
             }
         } else {  // 下跌
             // A级：超卖反弹机会
@@ -271,22 +367,34 @@ class TelegramService {
                 rating = 'A';
                 ratingEmoji = '💡';
                 suggestion = '可抄底';
-                reasons.push('✓ RSI超卖（跌过头了）');
-                reasons.push('✓ 放量下跌（恐慌抛售）');
-                reasons.push('✓ 可能反弹（超跌后易反弹）');
+                
+                detailedReasons.push(`✓ RSI超卖：RSI只有${rsi.toFixed(0)}，跌过头了，反弹概率大`);
+                detailedReasons.push(`✓ 放量下跌：成交量${volumeMultiplier.toFixed(1)}倍，恐慌盘在出清`);
+                detailedReasons.push(`✓ 超跌反弹：跌得越狠，反弹越猛`);
+                
+                operationTips.push(`• 抄底策略：分批建仓，别一次买太多`);
+                operationTips.push(`• 第1批：当前价买10-20%`);
+                operationTips.push(`• 第2批：再跌3-5%加仓`);
+                operationTips.push(`• 止损：跌破支撑位 ${supportLevel.toFixed(priceDecimals)}`);
             }
             // B级：多头回调或接近超卖
             else if ((trend === 'up' && rsi >= 40 && rsi <= 65) || (rsi <= 40 && volumeMultiplier >= 1.5)) {
                 rating = 'B';
                 ratingEmoji = '📊';
                 suggestion = '可观察';
-                if (trend === 'up' && rsi >= 40) {
-                    reasons.push('✓ 多头回调（趋势未变）');
-                    reasons.push('✓ RSI未超卖（健康调整）');
-                    if (volumeMultiplier >= 1.5) reasons.push('✓ 有一定量能（调整中）');
+                
+                if (trend === 'up' && rsi >= 40 && rsi <= 65) {
+                    detailedReasons.push(`✓ 健康回调：整体是上涨趋势，这是正常调整`);
+                    detailedReasons.push(`✓ 趋势未破：回调幅度不大，多头趋势仍在`);
+                    detailedReasons.push(`✓ RSI未超卖：RSI ${rsi.toFixed(0)}还算健康，说明只是调整`);
+                    
+                    operationTips.push(`• 建议：等跌到支撑位 ${supportLevel.toFixed(priceDecimals)} 附近`);
+                    operationTips.push(`• 如果支撑位稳住（不再跌），可以考虑买入`);
                 } else {
-                    reasons.push('✓ RSI偏低（接近超跌）');
-                    if (volumeMultiplier >= 2) reasons.push('✓ 放量下跌（可能快见底）');
+                    detailedReasons.push(`✓ RSI偏低：RSI ${rsi.toFixed(0)}接近超卖区域`);
+                    if (volumeMultiplier >= 2) {
+                        detailedReasons.push(`✓ 放量下跌：可能快见底了`);
+                    }
                 }
             }
             // C级：继续下跌风险
@@ -294,9 +402,43 @@ class TelegramService {
                 rating = 'C';
                 ratingEmoji = '⚠️';
                 suggestion = '先别买';
-                if (rsi > 65) reasons.push('✗ RSI偏高（还会跌）');
-                if (volumeMultiplier < 1.5) reasons.push('✗ 量能不足（慢慢阴跌）');
-                if (trend === 'down' && rsi > 50) reasons.push('✗ 空头趋势（跌势未完）');
+                
+                const priceChangeAbs = Math.abs(priceChange);
+                
+                if (rsi > 65) {
+                    detailedReasons.push(`✗ RSI还高：RSI ${rsi.toFixed(0)}还没超卖，说明还会跌`);
+                }
+                if (volumeMultiplier < 1.5) {
+                    detailedReasons.push(`✗ 量能不足：成交量只有${volumeMultiplier.toFixed(1)}倍，抄底买盘很弱`);
+                }
+                if (trend === 'down' && rsi > 50) {
+                    detailedReasons.push(`✗ 空头趋势：下跌趋势还没结束`);
+                }
+                
+                // 下跌场景警示
+                // 场景7：阴跌不止（量能<1x）
+                if (volumeMultiplier < 1.0 && priceChangeAbs > 5) {
+                    riskWarning = `⚠️ 阴跌不止警示:\n`;
+                    riskWarning += `缩量下跌${priceChangeAbs.toFixed(1)}%（量能${volumeMultiplier.toFixed(1)}倍）：\n`;
+                    riskWarning += `• 没有恐慌抛售，而是慢慢阴跌\n`;
+                    riskWarning += `• 说明没人愿意抄底，市场信心不足\n`;
+                    riskWarning += `• 这种跌法往往持续很久，跌幅更大\n`;
+                    riskWarning += `💡 建议：别急着抄底，等真正放量暴跌后再说`;
+                }
+                // 场景8：空头趋势持续下跌
+                else if (trend === 'down' && rsi > 50 && priceChangeAbs > 5) {
+                    if (!riskWarning) {
+                        riskWarning = `⚠️ 空头趋势警示:\n`;
+                        riskWarning += `下跌趋势中继续跌${priceChangeAbs.toFixed(1)}%，且RSI还有${rsi.toFixed(0)}：\n`;
+                        riskWarning += `• 下跌趋势未改变，这不是底部\n`;
+                        riskWarning += `• RSI还没到超卖区，说明跌势未尽\n`;
+                        riskWarning += `• 抄底要等RSI到30以下，才有反弹机会\n`;
+                        riskWarning += `💡 建议：耐心等待，不要试图接住下跌的刀`;
+                    }
+                }
+                
+                operationTips.push(`• 建议：先别买，等RSI跌到30以下再考虑`);
+                operationTips.push(`• 或者等趋势转为多头排列`);
             }
         }
         
@@ -325,11 +467,24 @@ class TelegramService {
         message += `💡 综合评级: ${rating}级信号\n`;
         message += `${ratingEmoji} 建议方向: ${suggestion}\n`;
         
-        // 原因分析（如果有原因）
-        if (reasons.length > 0) {
-            message += `\n📝 原因分析:\n`;
-            reasons.forEach(reason => {
+        // 详细分析
+        if (detailedReasons.length > 0) {
+            message += `\n📝 详细分析:\n`;
+            detailedReasons.forEach(reason => {
                 message += `${reason}\n`;
+            });
+        }
+        
+        // 庄家操作警示（仅在C级且满足条件时显示）
+        if (riskWarning) {
+            message += `\n${riskWarning}\n`;
+        }
+        
+        // 操作建议
+        if (operationTips.length > 0) {
+            message += `\n💰 操作建议:\n`;
+            operationTips.forEach(tip => {
+                message += `${tip}\n`;
             });
         }
         
