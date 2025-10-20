@@ -506,8 +506,18 @@ class TelegramService {
     }
 
     async testMessage() {
+        // 手动格式化时间（确保24小时制）
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');  // 24小时制
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const second = String(now.getSeconds()).padStart(2, '0');
+        const timeStr = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        
         const message = `🤖 测试消息\n` +
-            `时间：${new Date().toLocaleString()}\n` +
+            `时间：${timeStr}\n` +
             `如果你收到这条消息，说明 Telegram 机器人配置正确！`;
 
         try {
@@ -527,3 +537,4 @@ class TelegramService {
 }
 
 module.exports = new TelegramService();
+
